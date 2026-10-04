@@ -65,7 +65,7 @@ func init() {
 	getRatingCmd.Flags().StringVarP(
 		&onBehalfOfContentOwner, "onBehalfOfContentOwner", "b", "", pkg.OBOCOUsage,
 	)
-	getRatingCmd.Flags().StringP("output", "o", "", pkg.TableUsage)
+	getRatingCmd.Flags().StringP("output", "o", "table", pkg.TableUsage)
 	_ = getRatingCmd.MarkFlagRequired("ids")
 }
 

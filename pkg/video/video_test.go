@@ -6,6 +6,7 @@ package video
 import (
 	"bytes"
 	"encoding/json/v2"
+	"errors"
 	"io"
 	"mime"
 	"mime/multipart"
@@ -680,6 +681,124 @@ func TestVideo_Insert_FileError(t *testing.T) {
 	}
 }
 
+func TestVideo_Insert_ThumbnailError(t *testing.T) {
+	tmpDir := t.TempDir()
+	root, err := os.OpenRoot(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open root: %v", err)
+	}
+	oldRoot := pkg.Root
+	pkg.Root = root
+	defer func() { pkg.Root = oldRoot }()
+	defer func() { _ = root.Close() }()
+
+	if err := os.WriteFile(
+		tmpDir+"/test_video.mp4", []byte("dummy video content"), 0644,
+	); err != nil {
+		t.Fatalf("failed to create dummy file: %v", err)
+	}
+
+	svc := common.NewTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"new-video-id","snippet":{"title":"New Video","channelId":"channel-id"},"status":{"privacyStatus":"public"}}`)
+	}))
+
+	v := NewVideo(
+		WithService(svc),
+		WithFile("test_video.mp4"),
+		WithThumbnail("missing.jpg"),
+	)
+	if err := v.Insert(io.Discard); !errors.Is(err, errSetThumbnail) {
+		t.Fatalf("Video.Insert() error = %v, want errSetThumbnail", err)
+	}
+}
+
+func TestVideo_Insert_PlaylistItemError(t *testing.T) {
+	tmpDir := t.TempDir()
+	root, err := os.OpenRoot(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open root: %v", err)
+	}
+	oldRoot := pkg.Root
+	pkg.Root = root
+	defer func() { pkg.Root = oldRoot }()
+	defer func() { _ = root.Close() }()
+
+	if err := os.WriteFile(
+		tmpDir+"/test_video.mp4", []byte("dummy video content"), 0644,
+	); err != nil {
+		t.Fatalf("failed to create dummy file: %v", err)
+	}
+
+	svc := common.NewTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/playlistItems") {
+			http.Error(w, "playlist failure", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"new-video-id","snippet":{"title":"New Video","description":"Description","channelId":"channel-id"},"status":{"privacyStatus":"public"}}`)
+	}))
+
+	v := NewVideo(
+		WithService(svc),
+		WithFile("test_video.mp4"),
+		WithPlaylistId("playlist-id"),
+	)
+	if err := v.Insert(io.Discard); !errors.Is(err, errInsertPlaylistItem) {
+		t.Fatalf("Video.Insert() error = %v, want errInsertPlaylistItem", err)
+	}
+}
+
+func TestVideo_Insert_DoesNotReturnEarlyAfterUpload(t *testing.T) {
+	tmpDir := t.TempDir()
+	root, err := os.OpenRoot(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open root: %v", err)
+	}
+	oldRoot := pkg.Root
+	pkg.Root = root
+	defer func() { pkg.Root = oldRoot }()
+	defer func() { _ = root.Close() }()
+
+	if err := os.WriteFile(
+		tmpDir+"/test_video.mp4", []byte("dummy video content"), 0644,
+	); err != nil {
+		t.Fatalf("failed to create dummy file: %v", err)
+	}
+
+	var sawPlaylistInsert bool
+	svc := common.NewTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/playlistItems") {
+			sawPlaylistInsert = true
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"id":"playlist-item-id"}`)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"new-video-id","snippet":{"title":"New Video","description":"Description","channelId":"channel-id"},"status":{"privacyStatus":"public"}}`)
+	}))
+
+	v := NewVideo(
+		WithService(svc),
+		WithFile("test_video.mp4"),
+		WithThumbnail("missing.jpg"),
+		WithPlaylistId("playlist-id"),
+	)
+
+	var buf bytes.Buffer
+	err = v.Insert(&buf)
+	if !errors.Is(err, errSetThumbnail) {
+		t.Errorf("Video.Insert() error = %v, want errSetThumbnail", err)
+	}
+	if !sawPlaylistInsert {
+		t.Error("Video.Insert() returned before inserting playlist item")
+	}
+	if !strings.Contains(buf.String(), "Video inserted: new-video-id") {
+		t.Errorf("Video.Insert() output = %q, want final insert output", buf.String())
+	}
+}
+
 func TestVideo_Update(t *testing.T) {
 	embeddableTrue := true
 	containsSyntheticMediaTrue := true
@@ -1018,6 +1137,79 @@ func TestVideo_UpdateFalseStatusFields(t *testing.T) {
 	}
 }
 
+func TestVideo_Update_ThumbnailError(t *testing.T) {
+	tmpDir := t.TempDir()
+	root, err := os.OpenRoot(tmpDir)
+	if err != nil {
+		t.Fatalf("failed to open root: %v", err)
+	}
+	oldRoot := pkg.Root
+	pkg.Root = root
+	defer func() { pkg.Root = oldRoot }()
+	defer func() { _ = root.Close() }()
+
+	svc := common.NewTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			_, _ = io.WriteString(w, `{"items":[{"id":"video-id","snippet":{"title":"Old title","description":"Old description","channelId":"channel-id","categoryId":"22"},"status":{"privacyStatus":"public"}}]}`)
+			return
+		}
+		_, _ = io.WriteString(w, `{"id":"video-id","snippet":{"title":"New title","description":"Old description","channelId":"channel-id"},"status":{"privacyStatus":"public"}}`)
+	}))
+
+	v := NewVideo(
+		WithService(svc),
+		WithIds([]string{"video-id"}),
+		WithMaxResults(1),
+		WithTitle("New title"),
+		WithThumbnail("missing.jpg"),
+		WithOutput("silent"),
+	)
+	if err := v.Update(io.Discard); !errors.Is(err, errSetThumbnail) {
+		t.Fatalf("Video.Update() error = %v, want errSetThumbnail", err)
+	}
+}
+
+func TestVideo_Update_DoesNotReturnEarlyAfterUpdate(t *testing.T) {
+	var sawPlaylistInsert bool
+	svc := common.NewTestService(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/playlistItems") {
+			sawPlaylistInsert = true
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"id":"playlist-item-id"}`)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			_, _ = io.WriteString(w, `{"items":[{"id":"video-id","snippet":{"title":"Old title","description":"Description","channelId":"channel-id","categoryId":"22"},"status":{"privacyStatus":"public"}}]}`)
+			return
+		}
+		_, _ = io.WriteString(w, `{"id":"video-id","snippet":{"title":"New title","description":"Description","channelId":"channel-id"},"status":{"privacyStatus":"public"}}`)
+	}))
+
+	v := NewVideo(
+		WithService(svc),
+		WithIds([]string{"video-id"}),
+		WithMaxResults(1),
+		WithTitle("New title"),
+		WithThumbnail("missing.jpg"),
+		WithPlaylistId("playlist-id"),
+	)
+
+	var buf bytes.Buffer
+	err := v.Update(&buf)
+	if !errors.Is(err, errSetThumbnail) {
+		t.Errorf("Video.Update() error = %v, want errSetThumbnail", err)
+	}
+	if !sawPlaylistInsert {
+		t.Error("Video.Update() returned before inserting playlist item")
+	}
+	if !strings.Contains(buf.String(), "Video updated: video-id") {
+		t.Errorf("Video.Update() output = %q, want final update output", buf.String())
+	}
+}
+
 func TestVideo_Rate(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -1117,6 +1309,7 @@ func TestVideo_GetRating(t *testing.T) {
 			opts: []Option{
 				WithIds([]string{"video-id"}),
 				WithOnBehalfOfContentOwner("owner-id"),
+				WithOutput("table"),
 			},
 			verify: func(r *http.Request) {
 				if r.URL.Query().Get("onBehalfOfContentOwner") != "owner-id" {

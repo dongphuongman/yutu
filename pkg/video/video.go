@@ -22,6 +22,8 @@ var (
 	errGetVideo           = errors.New("failed to get video")
 	errInsertVideo        = errors.New("failed to insert video")
 	errUpdateVideo        = errors.New("failed to update video")
+	errSetThumbnail       = errors.New("failed to set video thumbnail")
+	errInsertPlaylistItem = errors.New("failed to add video to playlist")
 	errRating             = errors.New("failed to rate video")
 	errGetRating          = errors.New("failed to get rating")
 	errDeleteVideo        = errors.New("failed to delete video")
@@ -137,28 +139,30 @@ func (v *Video) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
-		v.Output, videos, writer, table.Row{"ID", "Title", "Channel ID", "Views"},
-		func(video *youtube.Video) table.Row {
-			title := ""
-			channelId := ""
-			var views uint64
-			if video.Snippet != nil {
-				title = video.Snippet.Title
-				channelId = video.Snippet.ChannelId
-			}
-			if video.Statistics != nil {
-				views = video.Statistics.ViewCount
-			}
-			return table.Row{video.Id, title, channelId, views}
-		},
+	return errors.Join(
+		err,
+		common.PrintList(
+			v.Output, videos, writer, table.Row{"ID", "Title", "Channel ID", "Views"},
+			func(video *youtube.Video) table.Row {
+				title := ""
+				channelId := ""
+				var views uint64
+				if video.Snippet != nil {
+					title = video.Snippet.Title
+					channelId = video.Snippet.ChannelId
+				}
+				if video.Statistics != nil {
+					views = video.Statistics.ViewCount
+				}
+				return table.Row{video.Id, title, channelId, views}
+			},
+		),
 	)
-	return err
 }
 
-func (v *Video) Insert(writer io.Writer) error {
-	if err := v.EnsureService(); err != nil {
-		return err
+func (v *Video) Insert(writer io.Writer) (errs error) {
+	if errs = v.EnsureService(); errs != nil {
+		return errs
 	}
 	file, err := pkg.OpenFile(v.File)
 	if err != nil {
@@ -255,7 +259,9 @@ func (v *Video) Insert(writer io.Writer) error {
 			thumbnail.WithService(v.Service),
 			thumbnail.WithOutput("silent"),
 		)
-		_ = t.Set(nil)
+		if err := t.Set(io.Discard); err != nil {
+			errs = errors.Join(errs, errInsertVideo, errSetThumbnail, err)
+		}
 	}
 
 	if v.PlaylistId != "" {
@@ -271,19 +277,23 @@ func (v *Video) Insert(writer io.Writer) error {
 			playlistItem.WithOutput("silent"),
 		)
 
-		_ = pi.Insert(writer)
+		if err := pi.Insert(io.Discard); err != nil {
+			errs = errors.Join(errs, errInsertVideo, errInsertPlaylistItem, err)
+		}
 	}
 
-	common.PrintResult(v.Output, res, writer, "Video inserted: %s\n", res.Id)
-	return nil
+	errs = errors.Join(errs, common.PrintResult(
+		v.Output, res, writer, "Video inserted: %s\n", res.Id,
+	))
+	return errs
 }
 
 // Update preserves nil Description, Language, PublishAt, and RecordingDate inputs.
 // Non-nil empty strings clear those properties by omitting them from the updated
 // resource part; timestamp clears must not be sent as empty timestamp strings.
-func (v *Video) Update(writer io.Writer) error {
-	if err := v.EnsureService(); err != nil {
-		return err
+func (v *Video) Update(writer io.Writer) (errs error) {
+	if errs = v.EnsureService(); errs != nil {
+		return errs
 	}
 	v.Parts = []string{"id", "snippet", "status"}
 	videos, err := v.Get()
@@ -386,7 +396,9 @@ func (v *Video) Update(writer io.Writer) error {
 			thumbnail.WithService(v.Service),
 			thumbnail.WithOutput("silent"),
 		)
-		_ = t.Set(nil)
+		if err := t.Set(io.Discard); err != nil {
+			errs = errors.Join(errs, errUpdateVideo, errSetThumbnail, err)
+		}
 	}
 
 	if v.PlaylistId != "" {
@@ -402,26 +414,32 @@ func (v *Video) Update(writer io.Writer) error {
 			playlistItem.WithOutput("silent"),
 		)
 
-		_ = pi.Insert(writer)
+		if err := pi.Insert(io.Discard); err != nil {
+			errs = errors.Join(errs, errUpdateVideo, errInsertPlaylistItem, err)
+		}
 	}
 
-	common.PrintResult(v.Output, res, writer, "Video updated: %s\n", res.Id)
-	return nil
+	errs = errors.Join(
+		errs, common.PrintResult(v.Output, res, writer, "Video updated: %s\n", res.Id),
+	)
+	return errs
 }
 
-func (v *Video) Rate(writer io.Writer) error {
-	if err := v.EnsureService(); err != nil {
-		return err
+func (v *Video) Rate(writer io.Writer) (errs error) {
+	if errs = v.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range v.Ids {
 		call := v.Service.Videos.Rate(id, v.Rating)
 		err := call.Do()
 		if err != nil {
-			return errors.Join(errRating, err)
+			errs = errors.Join(errs, errRating, err)
+			continue
 		}
-		_, _ = fmt.Fprintf(writer, "Video %s rated %s\n", id, v.Rating)
+		_, err = fmt.Fprintf(writer, "Video %s rated %s\n", id, v.Rating)
+		errs = errors.Join(errs, err)
 	}
-	return nil
+	return errs
 }
 
 func (v *Video) GetRating(writer io.Writer) error {
@@ -437,27 +455,17 @@ func (v *Video) GetRating(writer io.Writer) error {
 		return errors.Join(errGetRating, err)
 	}
 
-	switch v.Output {
-	case "json":
-		utils.PrintJSON(res.Items, writer)
-	case "yaml":
-		utils.PrintYAML(res.Items, writer)
-	default:
-		tb := table.NewWriter()
-		defer tb.Render()
-		tb.SetOutputMirror(writer)
-		tb.SetStyle(pkg.TableStyle)
-		tb.AppendHeader(table.Row{"ID", "Rating"})
-		for _, item := range res.Items {
-			tb.AppendRow(table.Row{item.VideoId, item.Rating})
-		}
-	}
-	return nil
+	return common.PrintList(
+		v.Output, res.Items, writer, table.Row{"ID", "Rating"},
+		func(item *youtube.VideoRating) table.Row {
+			return table.Row{item.VideoId, item.Rating}
+		},
+	)
 }
 
-func (v *Video) Delete(writer io.Writer) error {
-	if err := v.EnsureService(); err != nil {
-		return err
+func (v *Video) Delete(writer io.Writer) (errs error) {
+	if errs = v.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range v.Ids {
 		call := v.Service.Videos.Delete(id)
@@ -467,16 +475,18 @@ func (v *Video) Delete(writer io.Writer) error {
 
 		err := call.Do()
 		if err != nil {
-			return errors.Join(errDeleteVideo, err)
+			errs = errors.Join(errs, errDeleteVideo, err)
+			continue
 		}
-		_, _ = fmt.Fprintf(writer, "Video %s deleted", id)
+		_, err = fmt.Fprintf(writer, "Video %s deleted", id)
+		errs = errors.Join(errs, err)
 	}
-	return nil
+	return errs
 }
 
-func (v *Video) ReportAbuse(writer io.Writer) error {
-	if err := v.EnsureService(); err != nil {
-		return err
+func (v *Video) ReportAbuse(writer io.Writer) (errs error) {
+	if errs = v.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range v.Ids {
 		videoAbuseReport := &youtube.VideoAbuseReport{
@@ -496,12 +506,14 @@ func (v *Video) ReportAbuse(writer io.Writer) error {
 
 		err := call.Do()
 		if err != nil {
-			return errors.Join(errReportAbuse, err)
+			errs = errors.Join(errs, errReportAbuse, err)
+			continue
 		}
 
-		_, _ = fmt.Fprintf(writer, "Video %s reported for abuse", id)
+		_, err = fmt.Fprintf(writer, "Video %s reported for abuse", id)
+		errs = errors.Join(errs, err)
 	}
-	return nil
+	return errs
 }
 
 func WithAutoLevels(autoLevels *bool) Option {
