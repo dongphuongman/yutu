@@ -68,26 +68,28 @@ func (m *LiveChatMessage) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
-		m.Output, messages, writer,
-		table.Row{"ID", "Type", "Author", "Message"},
-		func(msg *youtube.LiveChatMessage) table.Row {
-			var authorName, msgText string
-			if msg.AuthorDetails != nil {
-				authorName = msg.AuthorDetails.DisplayName
-			}
-			if msg.Snippet != nil {
-				msgText = msg.Snippet.DisplayMessage
-			}
-			return table.Row{
-				msg.Id,
-				msg.Snippet.Type,
-				authorName,
-				msgText,
-			}
-		},
+	return errors.Join(
+		err,
+		common.PrintList(
+			m.Output, messages, writer,
+			table.Row{"ID", "Type", "Author", "Message"},
+			func(msg *youtube.LiveChatMessage) table.Row {
+				var authorName, msgText string
+				if msg.AuthorDetails != nil {
+					authorName = msg.AuthorDetails.DisplayName
+				}
+				if msg.Snippet != nil {
+					msgText = msg.Snippet.DisplayMessage
+				}
+				return table.Row{
+					msg.Id,
+					msg.Snippet.Type,
+					authorName,
+					msgText,
+				}
+			},
+		),
 	)
-	return err
 }
 
 func (m *LiveChatMessage) Insert(writer io.Writer) error {
@@ -110,45 +112,49 @@ func (m *LiveChatMessage) Insert(writer io.Writer) error {
 		return errors.Join(errInsertLiveChatMessage, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		m.Output, res, writer, "Live chat message inserted: %s\n", res.Id,
 	)
-	return nil
 }
 
-func (m *LiveChatMessage) Delete(writer io.Writer) error {
-	if err := m.EnsureService(); err != nil {
-		return err
+func (m *LiveChatMessage) Delete(writer io.Writer) (errs error) {
+	if errs = m.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range m.Ids {
 		call := m.Service.LiveChatMessages.Delete(id)
 		err := call.Do()
 		if err != nil {
-			return errors.Join(errDeleteLiveChatMessage, err)
+			errs = errors.Join(errs, errDeleteLiveChatMessage, err)
+			continue
 		}
 
-		_, _ = fmt.Fprintf(writer, "Live chat message %s deleted\n", id)
+		_, err = fmt.Fprintf(writer, "Live chat message %s deleted\n", id)
+		errs = errors.Join(errs, err)
 	}
-	return nil
+	return errs
 }
 
-func (m *LiveChatMessage) Transition(writer io.Writer) error {
-	if err := m.EnsureService(); err != nil {
-		return err
+func (m *LiveChatMessage) Transition(writer io.Writer) (errs error) {
+	if errs = m.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range m.Ids {
 		call := m.Service.LiveChatMessages.Transition().Id(id).Status(m.Status)
 		res, err := call.Do()
 		if err != nil {
-			return errors.Join(errTransitionLiveChatMessage, err)
+			errs = errors.Join(errs, errTransitionLiveChatMessage, err)
+			continue
 		}
 
-		common.PrintResult(
-			m.Output, res, writer,
-			"Live chat message %s transitioned to %s\n", id, m.Status,
+		errs = errors.Join(
+			errs, common.PrintResult(
+				m.Output, res, writer, "Live chat message %s transitioned to %s\n",
+				id, m.Status,
+			),
 		)
 	}
-	return nil
+	return errs
 }
 
 func WithLiveChatId(liveChatId string) Option {

@@ -67,13 +67,15 @@ func (m *Member) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
-		m.Output, members, writer, table.Row{"Channel ID", "Display Name"},
-		func(m *youtube.Member) table.Row {
-			return table.Row{m.Snippet.MemberDetails.ChannelId, m.Snippet.MemberDetails.DisplayName}
-		},
+	return errors.Join(
+		err,
+		common.PrintList(
+			m.Output, members, writer, table.Row{"Channel ID", "Display Name"},
+			func(m *youtube.Member) table.Row {
+				return table.Row{m.Snippet.MemberDetails.ChannelId, m.Snippet.MemberDetails.DisplayName}
+			},
+		),
 	)
-	return err
 }
 
 func WithMemberChannelId(channelId string) Option {

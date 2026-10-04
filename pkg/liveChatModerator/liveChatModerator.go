@@ -62,18 +62,20 @@ func (m *LiveChatModerator) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
-		m.Output, moderators, writer,
-		table.Row{"ID", "Channel ID", "Display Name"},
-		func(mod *youtube.LiveChatModerator) table.Row {
-			return table.Row{
-				mod.Id,
-				mod.Snippet.ModeratorDetails.ChannelId,
-				mod.Snippet.ModeratorDetails.DisplayName,
-			}
-		},
+	return errors.Join(
+		err,
+		common.PrintList(
+			m.Output, moderators, writer,
+			table.Row{"ID", "Channel ID", "Display Name"},
+			func(mod *youtube.LiveChatModerator) table.Row {
+				return table.Row{
+					mod.Id,
+					mod.Snippet.ModeratorDetails.ChannelId,
+					mod.Snippet.ModeratorDetails.DisplayName,
+				}
+			},
+		),
 	)
-	return err
 }
 
 func (m *LiveChatModerator) Insert(writer io.Writer) error {
@@ -95,26 +97,27 @@ func (m *LiveChatModerator) Insert(writer io.Writer) error {
 		return errors.Join(errInsertLiveChatModerator, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		m.Output, res, writer, "Live chat moderator inserted: %s\n", res.Id,
 	)
-	return nil
 }
 
-func (m *LiveChatModerator) Delete(writer io.Writer) error {
-	if err := m.EnsureService(); err != nil {
-		return err
+func (m *LiveChatModerator) Delete(writer io.Writer) (errs error) {
+	if errs = m.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range m.Ids {
 		call := m.Service.LiveChatModerators.Delete(id)
 		err := call.Do()
 		if err != nil {
-			return errors.Join(errDeleteLiveChatModerator, err)
+			errs = errors.Join(errs, errDeleteLiveChatModerator, err)
+			continue
 		}
 
-		_, _ = fmt.Fprintf(writer, "Live chat moderator %s deleted\n", id)
+		_, err = fmt.Fprintf(writer, "Live chat moderator %s deleted\n", id)
+		errs = errors.Join(errs, err)
 	}
-	return nil
+	return errs
 }
 
 func WithLiveChatId(liveChatId string) Option {

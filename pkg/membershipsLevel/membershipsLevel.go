@@ -35,7 +35,6 @@ func NewMembershipsLevel(opts ...Option) IMembershipsLevel[youtube.MembershipsLe
 	return m
 }
 
-
 func (m *MembershipsLevel) Get() ([]*youtube.MembershipsLevel, error) {
 	if err := m.EnsureService(); err != nil {
 		return nil, err
@@ -55,13 +54,12 @@ func (m *MembershipsLevel) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
+	return common.PrintList(
 		m.Output, levels, writer, table.Row{"ID", "Display Name"},
 		func(ml *youtube.MembershipsLevel) table.Row {
 			return table.Row{ml.Id, ml.Snippet.LevelDetails.DisplayName}
 		},
 	)
-	return nil
 }
 
 var (

@@ -61,26 +61,27 @@ func (b *LiveChatBan) Insert(writer io.Writer) error {
 		return errors.Join(errInsertLiveChatBan, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		b.Output, res, writer, "Live chat ban inserted: %s\n", res.Id,
 	)
-	return nil
 }
 
-func (b *LiveChatBan) Delete(writer io.Writer) error {
-	if err := b.EnsureService(); err != nil {
-		return err
+func (b *LiveChatBan) Delete(writer io.Writer) (errs error) {
+	if errs = b.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range b.Ids {
 		call := b.Service.LiveChatBans.Delete(id)
 		err := call.Do()
 		if err != nil {
-			return errors.Join(errDeleteLiveChatBan, err)
+			errs = errors.Join(errs, errDeleteLiveChatBan, err)
+			continue
 		}
 
-		_, _ = fmt.Fprintf(writer, "Live chat ban %s deleted\n", id)
+		_, err = fmt.Fprintf(writer, "Live chat ban %s deleted\n", id)
+		errs = errors.Join(errs, err)
 	}
-	return nil
+	return errs
 }
 
 func WithLiveChatId(liveChatId string) Option {

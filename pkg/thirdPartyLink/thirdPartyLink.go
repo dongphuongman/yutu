@@ -74,7 +74,7 @@ func (tpl *ThirdPartyLink) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
+	return common.PrintList(
 		tpl.Output, links, writer,
 		table.Row{"Linking Token", "Type", "Link Status"},
 		func(link *youtube.ThirdPartyLink) table.Row {
@@ -88,7 +88,6 @@ func (tpl *ThirdPartyLink) List(writer io.Writer) error {
 			return table.Row{link.LinkingToken, linkType, linkStatus}
 		},
 	)
-	return nil
 }
 
 func (tpl *ThirdPartyLink) Insert(writer io.Writer) error {
@@ -115,10 +114,9 @@ func (tpl *ThirdPartyLink) Insert(writer io.Writer) error {
 		return errors.Join(errInsertThirdPartyLink, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		tpl.Output, res, writer, "Third party link inserted: %s\n", res.LinkingToken,
 	)
-	return nil
 }
 
 func (tpl *ThirdPartyLink) Update(writer io.Writer) error {
@@ -161,10 +159,9 @@ func (tpl *ThirdPartyLink) Update(writer io.Writer) error {
 		return errors.Join(errUpdateThirdPartyLink, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		tpl.Output, res, writer, "Third party link updated: %s\n", res.LinkingToken,
 	)
-	return nil
 }
 
 func (tpl *ThirdPartyLink) Delete(writer io.Writer) error {
@@ -184,8 +181,8 @@ func (tpl *ThirdPartyLink) Delete(writer io.Writer) error {
 		return errors.Join(errDeleteThirdPartyLink, err)
 	}
 
-	_, _ = fmt.Fprintf(writer, "Third party link deleted: %s\n", tpl.LinkingToken)
-	return nil
+	_, err = fmt.Fprintf(writer, "Third party link deleted: %s\n", tpl.LinkingToken)
+	return err
 }
 
 func WithLinkingToken(linkingToken string) Option {

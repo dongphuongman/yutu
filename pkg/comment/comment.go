@@ -84,22 +84,24 @@ func (c *Comment) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
-		c.Output, comments, writer,
-		table.Row{"ID", "Author", "Video ID", "Text Display"},
-		func(cm *youtube.Comment) table.Row {
-			author := ""
-			videoId := ""
-			textDisplay := ""
-			if cm.Snippet != nil {
-				author = cm.Snippet.AuthorDisplayName
-				videoId = cm.Snippet.VideoId
-				textDisplay = cm.Snippet.TextDisplay
-			}
-			return table.Row{cm.Id, author, videoId, textDisplay}
-		},
+	return errors.Join(
+		err,
+		common.PrintList(
+			c.Output, comments, writer,
+			table.Row{"ID", "Author", "Video ID", "Text Display"},
+			func(cm *youtube.Comment) table.Row {
+				author := ""
+				videoId := ""
+				textDisplay := ""
+				if cm.Snippet != nil {
+					author = cm.Snippet.AuthorDisplayName
+					videoId = cm.Snippet.VideoId
+					textDisplay = cm.Snippet.TextDisplay
+				}
+				return table.Row{cm.Id, author, videoId, textDisplay}
+			},
+		),
 	)
-	return err
 }
 
 func (c *Comment) Insert(writer io.Writer) error {
@@ -128,8 +130,9 @@ func (c *Comment) Insert(writer io.Writer) error {
 		return errors.Join(errInsertComment, err)
 	}
 
-	common.PrintResult(c.Output, res, writer, "Comment inserted: %s\n", res.Id)
-	return nil
+	return common.PrintResult(
+		c.Output, res, writer, "Comment inserted: %s\n", res.Id,
+	)
 }
 
 func (c *Comment) Update(writer io.Writer) error {
@@ -168,8 +171,9 @@ func (c *Comment) Update(writer io.Writer) error {
 		return errors.Join(errUpdateComment, err)
 	}
 
-	common.PrintResult(c.Output, res, writer, "Comment updated: %s\n", res.Id)
-	return nil
+	return common.PrintResult(
+		c.Output, res, writer, "Comment updated: %s\n", res.Id,
+	)
 }
 
 func (c *Comment) MarkAsSpam(writer io.Writer) error {
@@ -182,8 +186,9 @@ func (c *Comment) MarkAsSpam(writer io.Writer) error {
 		return errors.Join(errMarkAsSpam, err)
 	}
 
-	common.PrintResult(c.Output, c, writer, "Comment marked as spam: %s\n", c.Ids)
-	return nil
+	return common.PrintResult(
+		c.Output, c, writer, "Comment marked as spam: %s\n", c.Ids,
+	)
 }
 
 func (c *Comment) SetModerationStatus(writer io.Writer) error {
@@ -201,26 +206,27 @@ func (c *Comment) SetModerationStatus(writer io.Writer) error {
 		return errors.Join(errSetModerationStatus, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		c.Output, c, writer, "Comment moderation status set to %s: %s\n",
 		c.ModerationStatus, c.Ids,
 	)
-	return nil
 }
 
-func (c *Comment) Delete(writer io.Writer) error {
-	if err := c.EnsureService(); err != nil {
-		return err
+func (c *Comment) Delete(writer io.Writer) (errs error) {
+	if errs = c.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range c.Ids {
 		call := c.Service.Comments.Delete(id)
 		err := call.Do()
 		if err != nil {
-			return errors.Join(errDeleteComment, err)
+			errs = errors.Join(errs, errDeleteComment, err)
+			continue
 		}
-		_, _ = fmt.Fprintf(writer, "Comment %s deleted\n", id)
+		_, err = fmt.Fprintf(writer, "Comment %s deleted\n", id)
+		errs = errors.Join(errs, err)
 	}
-	return nil
+	return errs
 }
 
 func WithAuthorChannelId(authorChannelId string) Option {

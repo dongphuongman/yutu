@@ -93,19 +93,21 @@ func (c *Channel) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
-		c.Output, channels, writer, table.Row{"ID", "Title", "Country"},
-		func(ch *youtube.Channel) table.Row {
-			title := ""
-			country := ""
-			if ch.Snippet != nil {
-				title = ch.Snippet.Title
-				country = ch.Snippet.Country
-			}
-			return table.Row{ch.Id, title, country}
-		},
+	return errors.Join(
+		err,
+		common.PrintList(
+			c.Output, channels, writer, table.Row{"ID", "Title", "Country"},
+			func(ch *youtube.Channel) table.Row {
+				title := ""
+				country := ""
+				if ch.Snippet != nil {
+					title = ch.Snippet.Title
+					country = ch.Snippet.Country
+				}
+				return table.Row{ch.Id, title, country}
+			},
+		),
 	)
-	return err
 }
 
 func (c *Channel) Update(writer io.Writer) error {
@@ -141,8 +143,9 @@ func (c *Channel) Update(writer io.Writer) error {
 		return errors.Join(errUpdateChannel, err)
 	}
 
-	common.PrintResult(c.Output, res, writer, "Channel updated: %s\n", res.Id)
-	return nil
+	return common.PrintResult(
+		c.Output, res, writer, "Channel updated: %s\n", res.Id,
+	)
 }
 
 func WithCategoryId(categoryId string) Option {

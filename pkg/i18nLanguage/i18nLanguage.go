@@ -60,13 +60,12 @@ func (i *I18nLanguage) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
+	return common.PrintList(
 		i.Output, languages, writer, table.Row{"ID", "Hl", "Name"},
 		func(l *youtube.I18nLanguage) table.Row {
 			return table.Row{l.Id, l.Snippet.Hl, l.Snippet.Name}
 		},
 	)
-	return nil
 }
 
 var (

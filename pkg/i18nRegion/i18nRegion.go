@@ -58,13 +58,12 @@ func (i *I18nRegion) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
+	return common.PrintList(
 		i.Output, regions, writer, table.Row{"ID", "Gl", "Name"},
 		func(r *youtube.I18nRegion) table.Row {
 			return table.Row{r.Id, r.Snippet.Gl, r.Snippet.Name}
 		},
 	)
-	return nil
 }
 
 var (

@@ -90,15 +90,17 @@ func (c *CommentThread) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
-		c.Output, commentThreads, writer,
-		table.Row{"ID", "Author", "Video ID", "Text Display"},
-		func(cot *youtube.CommentThread) table.Row {
-			snippet := cot.Snippet.TopLevelComment.Snippet
-			return table.Row{cot.Id, snippet.AuthorDisplayName, snippet.VideoId, snippet.TextDisplay}
-		},
+	return errors.Join(
+		err,
+		common.PrintList(
+			c.Output, commentThreads, writer,
+			table.Row{"ID", "Author", "Video ID", "Text Display"},
+			func(cot *youtube.CommentThread) table.Row {
+				snippet := cot.Snippet.TopLevelComment.Snippet
+				return table.Row{cot.Id, snippet.AuthorDisplayName, snippet.VideoId, snippet.TextDisplay}
+			},
+		),
 	)
-	return err
 }
 
 func (c *CommentThread) Insert(writer io.Writer) error {
@@ -126,10 +128,9 @@ func (c *CommentThread) Insert(writer io.Writer) error {
 		return errors.Join(errInsertCommentThread, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		c.Output, res, writer, "CommentThread inserted: %s\n", res.Id,
 	)
-	return nil
 }
 
 func WithAllThreadsRelatedToChannelId(allThreadsRelatedToChannelId string) Option {

@@ -102,24 +102,26 @@ func (b *LiveBroadcast) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
-		b.Output, broadcasts, writer,
-		table.Row{"ID", "Title", "Status", "Privacy"},
-		func(bc *youtube.LiveBroadcast) table.Row {
-			title := ""
-			status := ""
-			privacy := ""
-			if bc.Snippet != nil {
-				title = bc.Snippet.Title
-			}
-			if bc.Status != nil {
-				status = bc.Status.LifeCycleStatus
-				privacy = bc.Status.PrivacyStatus
-			}
-			return table.Row{bc.Id, title, status, privacy}
-		},
+	return errors.Join(
+		err,
+		common.PrintList(
+			b.Output, broadcasts, writer,
+			table.Row{"ID", "Title", "Status", "Privacy"},
+			func(bc *youtube.LiveBroadcast) table.Row {
+				title := ""
+				status := ""
+				privacy := ""
+				if bc.Snippet != nil {
+					title = bc.Snippet.Title
+				}
+				if bc.Status != nil {
+					status = bc.Status.LifeCycleStatus
+					privacy = bc.Status.PrivacyStatus
+				}
+				return table.Row{bc.Id, title, status, privacy}
+			},
+		),
 	)
-	return err
 }
 
 func (b *LiveBroadcast) Insert(writer io.Writer) error {
@@ -153,10 +155,9 @@ func (b *LiveBroadcast) Insert(writer io.Writer) error {
 		return errors.Join(errInsertLiveBroadcast, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		b.Output, res, writer, "Live broadcast inserted: %s\n", res.Id,
 	)
-	return nil
 }
 
 func (b *LiveBroadcast) Update(writer io.Writer) error {
@@ -218,15 +219,14 @@ func (b *LiveBroadcast) Update(writer io.Writer) error {
 		return errors.Join(errUpdateLiveBroadcast, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		b.Output, res, writer, "Live broadcast updated: %s\n", res.Id,
 	)
-	return nil
 }
 
-func (b *LiveBroadcast) Delete(writer io.Writer) error {
-	if err := b.EnsureService(); err != nil {
-		return err
+func (b *LiveBroadcast) Delete(writer io.Writer) (errs error) {
+	if errs = b.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range b.Ids {
 		call := b.Service.LiveBroadcasts.Delete(id)
@@ -239,17 +239,19 @@ func (b *LiveBroadcast) Delete(writer io.Writer) error {
 
 		err := call.Do()
 		if err != nil {
-			return errors.Join(errDeleteLiveBroadcast, err)
+			errs = errors.Join(errs, errDeleteLiveBroadcast, err)
+			continue
 		}
 
-		_, _ = fmt.Fprintf(writer, "Live broadcast %s deleted\n", id)
+		_, err = fmt.Fprintf(writer, "Live broadcast %s deleted\n", id)
+		errs = errors.Join(errs, err)
 	}
-	return nil
+	return errs
 }
 
-func (b *LiveBroadcast) Bind(writer io.Writer) error {
-	if err := b.EnsureService(); err != nil {
-		return err
+func (b *LiveBroadcast) Bind(writer io.Writer) (errs error) {
+	if errs = b.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range b.Ids {
 		call := b.Service.LiveBroadcasts.Bind(id, b.Parts)
@@ -265,20 +267,23 @@ func (b *LiveBroadcast) Bind(writer io.Writer) error {
 
 		res, err := call.Do()
 		if err != nil {
-			return errors.Join(errBindLiveBroadcast, err)
+			errs = errors.Join(errs, errBindLiveBroadcast, err)
+			continue
 		}
 
-		common.PrintResult(
-			b.Output, res, writer, "Live broadcast %s bound to stream %s\n", res.Id,
-			b.StreamId,
+		errs = errors.Join(
+			errs, common.PrintResult(
+				b.Output, res, writer, "Live broadcast %s bound to stream %s\n",
+				res.Id, b.StreamId,
+			),
 		)
 	}
-	return nil
+	return errs
 }
 
-func (b *LiveBroadcast) Transition(writer io.Writer) error {
-	if err := b.EnsureService(); err != nil {
-		return err
+func (b *LiveBroadcast) Transition(writer io.Writer) (errs error) {
+	if errs = b.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range b.Ids {
 		call := b.Service.LiveBroadcasts.Transition(b.BroadcastStatus, id, b.Parts)
@@ -291,20 +296,23 @@ func (b *LiveBroadcast) Transition(writer io.Writer) error {
 
 		res, err := call.Do()
 		if err != nil {
-			return errors.Join(errTransitionLiveBroadcast, err)
+			errs = errors.Join(errs, errTransitionLiveBroadcast, err)
+			continue
 		}
 
-		common.PrintResult(
-			b.Output, res, writer,
-			"Live broadcast %s transitioned to %s\n", id, b.BroadcastStatus,
+		errs = errors.Join(
+			errs, common.PrintResult(
+				b.Output, res, writer, "Live broadcast %s transitioned to %s\n",
+				id, b.BroadcastStatus,
+			),
 		)
 	}
-	return nil
+	return errs
 }
 
-func (b *LiveBroadcast) InsertCuepoint(writer io.Writer) error {
-	if err := b.EnsureService(); err != nil {
-		return err
+func (b *LiveBroadcast) InsertCuepoint(writer io.Writer) (errs error) {
+	if errs = b.EnsureService(); errs != nil {
+		return errs
 	}
 	cuepoint := &youtube.Cuepoint{
 		CueType:               b.CueType,
@@ -324,15 +332,18 @@ func (b *LiveBroadcast) InsertCuepoint(writer io.Writer) error {
 
 		res, err := call.Do()
 		if err != nil {
-			return errors.Join(errInsertCuepointLiveBroadcast, err)
+			errs = errors.Join(errs, errInsertCuepointLiveBroadcast, err)
+			continue
 		}
 
-		common.PrintResult(
-			b.Output, res, writer, "Cuepoint inserted for broadcast %s: %s\n", id,
-			res.Id,
+		errs = errors.Join(
+			errs, common.PrintResult(
+				b.Output, res, writer, "Cuepoint inserted for broadcast %s: %s\n",
+				id, res.Id,
+			),
 		)
 	}
-	return nil
+	return errs
 }
 
 func WithTitle(title string) Option {

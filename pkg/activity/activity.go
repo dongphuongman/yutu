@@ -18,10 +18,10 @@ var (
 
 type Activity struct {
 	common.Fields
-	For            string `yaml:"for" json:"for,omitempty"`
-	PublishedAfter string `yaml:"published_after" json:"published_after,omitempty"`
+	For             string `yaml:"for" json:"for,omitempty"`
+	PublishedAfter  string `yaml:"published_after" json:"published_after,omitempty"`
 	PublishedBefore string `yaml:"published_before" json:"published_before,omitempty"`
-	RegionCode     string `yaml:"region_code" json:"region_code,omitempty"`
+	RegionCode      string `yaml:"region_code" json:"region_code,omitempty"`
 }
 
 type IActivity[T any] interface {
@@ -81,13 +81,15 @@ func (a *Activity) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
-		a.Output, activities, writer, table.Row{"ID", "Title", "Type", "Time"},
-		func(a *youtube.Activity) table.Row {
-			return table.Row{a.Id, a.Snippet.Title, a.Snippet.Type, a.Snippet.PublishedAt}
-		},
+	return errors.Join(
+		err,
+		common.PrintList(
+			a.Output, activities, writer, table.Row{"ID", "Title", "Type", "Time"},
+			func(a *youtube.Activity) table.Row {
+				return table.Row{a.Id, a.Snippet.Title, a.Snippet.Type, a.Snippet.PublishedAt}
+			},
+		),
 	)
-	return err
 }
 
 func WithFor(f string) Option {

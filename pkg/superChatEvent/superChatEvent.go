@@ -58,13 +58,15 @@ func (s *SuperChatEvent) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
-		s.Output, events, writer, table.Row{"ID", "Amount", "Comment", "Supporter"},
-		func(e *youtube.SuperChatEvent) table.Row {
-			return table.Row{e.Id, e.Snippet.DisplayString, e.Snippet.CommentText, e.Snippet.SupporterDetails.DisplayName}
-		},
+	return errors.Join(
+		err,
+		common.PrintList(
+			s.Output, events, writer, table.Row{"ID", "Amount", "Comment", "Supporter"},
+			func(e *youtube.SuperChatEvent) table.Row {
+				return table.Row{e.Id, e.Snippet.DisplayString, e.Snippet.CommentText, e.Snippet.SupporterDetails.DisplayName}
+			},
+		),
 	)
-	return err
 }
 
 var (

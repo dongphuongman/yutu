@@ -6,10 +6,12 @@ package liveBroadcast
 import (
 	"bytes"
 	"encoding/json/v2"
+	"errors"
 	"io"
 	"math"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/eat-pray-ai/yutu/pkg/common"
@@ -528,6 +530,42 @@ func TestLiveBroadcast_Delete(t *testing.T) {
 	}
 }
 
+func TestLiveBroadcast_Delete_DoesNotReturnEarly(t *testing.T) {
+	var gotIDs []string
+	svc := common.NewTestService(
+		t, http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				id := r.URL.Query().Get("id")
+				gotIDs = append(gotIDs, id)
+
+				if id == "broadcast-1" {
+					http.Error(w, "server error", http.StatusInternalServerError)
+					return
+				}
+
+				w.WriteHeader(http.StatusNoContent)
+			},
+		),
+	)
+
+	b := NewLiveBroadcast(
+		WithService(svc),
+		WithIds([]string{"broadcast-1", "broadcast-2"}),
+	)
+
+	var buf bytes.Buffer
+	err := b.Delete(&buf)
+	if !errors.Is(err, errDeleteLiveBroadcast) {
+		t.Errorf("LiveBroadcast.Delete() error = %v, want %v", err, errDeleteLiveBroadcast)
+	}
+	if !reflect.DeepEqual(gotIDs, []string{"broadcast-1", "broadcast-2"}) {
+		t.Errorf("LiveBroadcast.Delete() got IDs = %v, want [broadcast-1 broadcast-2]", gotIDs)
+	}
+	if !strings.Contains(buf.String(), "Live broadcast broadcast-2 deleted") {
+		t.Errorf("LiveBroadcast.Delete() output = %q, want successful second delete output", buf.String())
+	}
+}
+
 func TestLiveBroadcast_Bind(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -583,6 +621,45 @@ func TestLiveBroadcast_Bind(t *testing.T) {
 				}
 			},
 		)
+	}
+}
+
+func TestLiveBroadcast_Bind_DoesNotReturnEarly(t *testing.T) {
+	var gotIDs []string
+	svc := common.NewTestService(
+		t, http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				id := r.URL.Query().Get("id")
+				gotIDs = append(gotIDs, id)
+
+				if id == "broadcast-1" {
+					http.Error(w, "server error", http.StatusInternalServerError)
+					return
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"id": "broadcast-2"}`))
+			},
+		),
+	)
+
+	b := NewLiveBroadcast(
+		WithService(svc),
+		WithIds([]string{"broadcast-1", "broadcast-2"}),
+		WithStreamId("stream-id"),
+		WithParts([]string{"id", "snippet", "contentDetails", "status"}),
+	)
+
+	var buf bytes.Buffer
+	err := b.Bind(&buf)
+	if !errors.Is(err, errBindLiveBroadcast) {
+		t.Errorf("LiveBroadcast.Bind() error = %v, want %v", err, errBindLiveBroadcast)
+	}
+	if !reflect.DeepEqual(gotIDs, []string{"broadcast-1", "broadcast-2"}) {
+		t.Errorf("LiveBroadcast.Bind() got IDs = %v, want [broadcast-1 broadcast-2]", gotIDs)
+	}
+	if !strings.Contains(buf.String(), "Live broadcast broadcast-2 bound") {
+		t.Errorf("LiveBroadcast.Bind() output = %q, want successful second bind output", buf.String())
 	}
 }
 
@@ -644,6 +721,45 @@ func TestLiveBroadcast_Transition(t *testing.T) {
 				}
 			},
 		)
+	}
+}
+
+func TestLiveBroadcast_Transition_DoesNotReturnEarly(t *testing.T) {
+	var gotIDs []string
+	svc := common.NewTestService(
+		t, http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				id := r.URL.Query().Get("id")
+				gotIDs = append(gotIDs, id)
+
+				if id == "broadcast-1" {
+					http.Error(w, "server error", http.StatusInternalServerError)
+					return
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"id": "broadcast-2"}`))
+			},
+		),
+	)
+
+	b := NewLiveBroadcast(
+		WithService(svc),
+		WithIds([]string{"broadcast-1", "broadcast-2"}),
+		WithBroadcastStatus("live"),
+		WithParts([]string{"id", "snippet", "status"}),
+	)
+
+	var buf bytes.Buffer
+	err := b.Transition(&buf)
+	if !errors.Is(err, errTransitionLiveBroadcast) {
+		t.Errorf("LiveBroadcast.Transition() error = %v, want %v", err, errTransitionLiveBroadcast)
+	}
+	if !reflect.DeepEqual(gotIDs, []string{"broadcast-1", "broadcast-2"}) {
+		t.Errorf("LiveBroadcast.Transition() got IDs = %v, want [broadcast-1 broadcast-2]", gotIDs)
+	}
+	if !strings.Contains(buf.String(), "Live broadcast broadcast-2 transitioned") {
+		t.Errorf("LiveBroadcast.Transition() output = %q, want successful second transition output", buf.String())
 	}
 }
 
@@ -716,5 +832,44 @@ func TestLiveBroadcast_InsertCuepoint(t *testing.T) {
 				}
 			},
 		)
+	}
+}
+
+func TestLiveBroadcast_InsertCuepoint_DoesNotReturnEarly(t *testing.T) {
+	var gotIDs []string
+	svc := common.NewTestService(
+		t, http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				id := r.URL.Query().Get("id")
+				gotIDs = append(gotIDs, id)
+
+				if id == "broadcast-1" {
+					http.Error(w, "server error", http.StatusInternalServerError)
+					return
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"id": "cuepoint-id"}`))
+			},
+		),
+	)
+
+	b := NewLiveBroadcast(
+		WithService(svc),
+		WithIds([]string{"broadcast-1", "broadcast-2"}),
+		WithCueType("cueTypeAd"),
+		WithCueDurationSecs(30),
+	)
+
+	var buf bytes.Buffer
+	err := b.InsertCuepoint(&buf)
+	if !errors.Is(err, errInsertCuepointLiveBroadcast) {
+		t.Errorf("LiveBroadcast.InsertCuepoint() error = %v, want %v", err, errInsertCuepointLiveBroadcast)
+	}
+	if !reflect.DeepEqual(gotIDs, []string{"broadcast-1", "broadcast-2"}) {
+		t.Errorf("LiveBroadcast.InsertCuepoint() got IDs = %v, want [broadcast-1 broadcast-2]", gotIDs)
+	}
+	if !strings.Contains(buf.String(), "Cuepoint inserted for broadcast broadcast-2") {
+		t.Errorf("LiveBroadcast.InsertCuepoint() output = %q, want successful second cuepoint output", buf.String())
 	}
 }

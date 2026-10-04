@@ -82,22 +82,24 @@ func (s *LiveStream) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
-		s.Output, streams, writer,
-		table.Row{"ID", "Title", "Status"},
-		func(stream *youtube.LiveStream) table.Row {
-			title := ""
-			status := ""
-			if stream.Snippet != nil {
-				title = stream.Snippet.Title
-			}
-			if stream.Status != nil {
-				status = stream.Status.StreamStatus
-			}
-			return table.Row{stream.Id, title, status}
-		},
+	return errors.Join(
+		err,
+		common.PrintList(
+			s.Output, streams, writer,
+			table.Row{"ID", "Title", "Status"},
+			func(stream *youtube.LiveStream) table.Row {
+				title := ""
+				status := ""
+				if stream.Snippet != nil {
+					title = stream.Snippet.Title
+				}
+				if stream.Status != nil {
+					status = stream.Status.StreamStatus
+				}
+				return table.Row{stream.Id, title, status}
+			},
+		),
 	)
-	return err
 }
 
 func (s *LiveStream) Insert(writer io.Writer) error {
@@ -131,10 +133,9 @@ func (s *LiveStream) Insert(writer io.Writer) error {
 		return errors.Join(errInsertLiveStream, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		s.Output, res, writer, "Live stream inserted: %s\n", res.Id,
 	)
-	return nil
 }
 
 func (s *LiveStream) Update(writer io.Writer) error {
@@ -194,15 +195,14 @@ func (s *LiveStream) Update(writer io.Writer) error {
 		return errors.Join(errUpdateLiveStream, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		s.Output, res, writer, "Live stream updated: %s\n", res.Id,
 	)
-	return nil
 }
 
-func (s *LiveStream) Delete(writer io.Writer) error {
-	if err := s.EnsureService(); err != nil {
-		return err
+func (s *LiveStream) Delete(writer io.Writer) (errs error) {
+	if errs = s.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range s.Ids {
 		call := s.Service.LiveStreams.Delete(id)
@@ -215,12 +215,14 @@ func (s *LiveStream) Delete(writer io.Writer) error {
 
 		err := call.Do()
 		if err != nil {
-			return errors.Join(errDeleteLiveStream, err)
+			errs = errors.Join(errs, errDeleteLiveStream, err)
+			continue
 		}
 
-		_, _ = fmt.Fprintf(writer, "Live stream %s deleted\n", id)
+		_, err = fmt.Fprintf(writer, "Live stream %s deleted\n", id)
+		errs = errors.Join(errs, err)
 	}
-	return nil
+	return errs
 }
 
 func WithTitle(title string) Option {

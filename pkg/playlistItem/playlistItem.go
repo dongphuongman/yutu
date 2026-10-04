@@ -83,31 +83,33 @@ func (pi *PlaylistItem) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
-		pi.Output, playlistItems, writer,
-		table.Row{"ID", "Title", "Kind", "Resource ID"},
-		func(item *youtube.PlaylistItem) table.Row {
-			title := ""
-			kind := ""
-			resourceId := ""
-			if item.Snippet != nil {
-				title = item.Snippet.Title
-				if item.Snippet.ResourceId != nil {
-					kind = item.Snippet.ResourceId.Kind
-					switch kind {
-					case "youtube#video":
-						resourceId = item.Snippet.ResourceId.VideoId
-					case "youtube#channel":
-						resourceId = item.Snippet.ResourceId.ChannelId
-					case "youtube#playlist":
-						resourceId = item.Snippet.ResourceId.PlaylistId
+	return errors.Join(
+		err,
+		common.PrintList(
+			pi.Output, playlistItems, writer,
+			table.Row{"ID", "Title", "Kind", "Resource ID"},
+			func(item *youtube.PlaylistItem) table.Row {
+				title := ""
+				kind := ""
+				resourceId := ""
+				if item.Snippet != nil {
+					title = item.Snippet.Title
+					if item.Snippet.ResourceId != nil {
+						kind = item.Snippet.ResourceId.Kind
+						switch kind {
+						case "youtube#video":
+							resourceId = item.Snippet.ResourceId.VideoId
+						case "youtube#channel":
+							resourceId = item.Snippet.ResourceId.ChannelId
+						case "youtube#playlist":
+							resourceId = item.Snippet.ResourceId.PlaylistId
+						}
 					}
 				}
-			}
-			return table.Row{item.Id, title, kind, resourceId}
-		},
+				return table.Row{item.Id, title, kind, resourceId}
+			},
+		),
 	)
-	return err
 }
 
 func (pi *PlaylistItem) Insert(writer io.Writer) error {
@@ -160,10 +162,9 @@ func (pi *PlaylistItem) Insert(writer io.Writer) error {
 		return errors.Join(errInsertPlaylistItem, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		pi.Output, res, writer, "Playlist Item inserted: %s\n", res.Id,
 	)
-	return nil
 }
 
 func (pi *PlaylistItem) Update(writer io.Writer) error {
@@ -203,15 +204,14 @@ func (pi *PlaylistItem) Update(writer io.Writer) error {
 		return errors.Join(errUpdatePlaylistItem, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		pi.Output, res, writer, "Playlist Item updated: %s\n", res.Id,
 	)
-	return nil
 }
 
-func (pi *PlaylistItem) Delete(writer io.Writer) error {
-	if err := pi.EnsureService(); err != nil {
-		return err
+func (pi *PlaylistItem) Delete(writer io.Writer) (errs error) {
+	if errs = pi.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range pi.Ids {
 		call := pi.Service.PlaylistItems.Delete(id)
@@ -221,12 +221,14 @@ func (pi *PlaylistItem) Delete(writer io.Writer) error {
 
 		err := call.Do()
 		if err != nil {
-			return errors.Join(errDeletePlaylistItem, err)
+			errs = errors.Join(errs, errDeletePlaylistItem, err)
+			continue
 		}
 
-		_, _ = fmt.Fprintf(writer, "Playlist Item %s deleted\n", id)
+		_, err = fmt.Fprintf(writer, "Playlist Item %s deleted\n", id)
+		errs = errors.Join(errs, err)
 	}
-	return nil
+	return errs
 }
 
 func WithTitle(title string) Option {

@@ -94,23 +94,25 @@ func (s *Subscription) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
-		s.Output, subscriptions, writer,
-		table.Row{"ID", "Kind", "Resource ID", "Channel Title"},
-		func(sub *youtube.Subscription) table.Row {
-			var resourceId string
-			switch sub.Snippet.ResourceId.Kind {
-			case "youtube#video":
-				resourceId = sub.Snippet.ResourceId.VideoId
-			case "youtube#channel":
-				resourceId = sub.Snippet.ResourceId.ChannelId
-			case "youtube#playlist":
-				resourceId = sub.Snippet.ResourceId.PlaylistId
-			}
-			return table.Row{sub.Id, sub.Snippet.ResourceId.Kind, resourceId, sub.Snippet.Title}
-		},
+	return errors.Join(
+		err,
+		common.PrintList(
+			s.Output, subscriptions, writer,
+			table.Row{"ID", "Kind", "Resource ID", "Channel Title"},
+			func(sub *youtube.Subscription) table.Row {
+				var resourceId string
+				switch sub.Snippet.ResourceId.Kind {
+				case "youtube#video":
+					resourceId = sub.Snippet.ResourceId.VideoId
+				case "youtube#channel":
+					resourceId = sub.Snippet.ResourceId.ChannelId
+				case "youtube#playlist":
+					resourceId = sub.Snippet.ResourceId.PlaylistId
+				}
+				return table.Row{sub.Id, sub.Snippet.ResourceId.Kind, resourceId, sub.Snippet.Title}
+			},
+		),
 	)
-	return err
 }
 
 func (s *Subscription) Insert(writer io.Writer) error {
@@ -134,26 +136,27 @@ func (s *Subscription) Insert(writer io.Writer) error {
 		return errors.Join(errInsertSubscription, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		s.Output, res, writer, "Subscription inserted: %s\n", res.Id,
 	)
-	return nil
 }
 
-func (s *Subscription) Delete(writer io.Writer) error {
-	if err := s.EnsureService(); err != nil {
-		return err
+func (s *Subscription) Delete(writer io.Writer) (errs error) {
+	if errs = s.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range s.Ids {
 		call := s.Service.Subscriptions.Delete(id)
 		err := call.Do()
 		if err != nil {
-			return errors.Join(errDeleteSubscription, err)
+			errs = errors.Join(errs, errDeleteSubscription, err)
+			continue
 		}
 
-		_, _ = fmt.Fprintf(writer, "Subscription %s deleted", id)
+		_, err = fmt.Fprintf(writer, "Subscription %s deleted", id)
+		errs = errors.Join(errs, err)
 	}
-	return nil
+	return errs
 }
 
 func WithSubscriberChannelId(id string) Option {

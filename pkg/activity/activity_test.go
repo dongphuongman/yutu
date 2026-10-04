@@ -4,6 +4,7 @@
 package activity
 
 import (
+	"errors"
 	"io"
 	"math"
 	"net/http"
@@ -335,4 +336,48 @@ func TestActivity_List(t *testing.T) {
 			return a.List
 		},
 	)
+}
+
+var errWriteFailed = errors.New("write failed")
+
+type errWriter struct{}
+
+func (errWriter) Write([]byte) (int, error) {
+	return 0, errWriteFailed
+}
+
+func TestActivity_List_ReturnsFetchAndPrintErrors(t *testing.T) {
+	requestCount := 0
+	svc := common.NewTestService(
+		t, http.HandlerFunc(
+			func(w http.ResponseWriter, _ *http.Request) {
+				requestCount++
+				w.Header().Set("Content-Type", "application/json")
+				if requestCount == 1 {
+					_, _ = w.Write(
+						[]byte(`{
+							"items": [{"id": "activity-1", "snippet": {"title": "Activity 1", "type": "upload", "publishedAt": "2024-01-01T00:00:00Z"}}],
+							"nextPageToken": "next-page"
+						}`),
+					)
+					return
+				}
+				http.Error(w, "server error", http.StatusInternalServerError)
+			},
+		),
+	)
+
+	a := NewActivity(
+		WithService(svc),
+		WithOutput("table"),
+		WithMaxResults(22),
+	)
+
+	err := a.List(errWriter{})
+	if !errors.Is(err, errGetActivity) {
+		t.Errorf("Activity.List() error = %v, want %v", err, errGetActivity)
+	}
+	if !errors.Is(err, errWriteFailed) {
+		t.Errorf("Activity.List() error = %v, want write failed", err)
+	}
 }

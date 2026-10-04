@@ -89,13 +89,12 @@ func (c *Caption) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
+	return common.PrintList(
 		c.Output, captions, writer, table.Row{"ID", "Video ID", "Name", "Language"},
 		func(cap *youtube.Caption) table.Row {
 			return table.Row{cap.Id, cap.Snippet.VideoId, cap.Snippet.Name, cap.Snippet.Language}
 		},
 	)
-	return nil
 }
 
 func (c *Caption) Insert(writer io.Writer) error {
@@ -136,8 +135,9 @@ func (c *Caption) Insert(writer io.Writer) error {
 		return errors.Join(errInsertCaption, err)
 	}
 
-	common.PrintResult(c.Output, res, writer, "Caption inserted: %s\n", res.Id)
-	return nil
+	return common.PrintResult(
+		c.Output, res, writer, "Caption inserted: %s\n", res.Id,
+	)
 }
 
 func (c *Caption) Update(writer io.Writer) error {
@@ -218,13 +218,14 @@ func (c *Caption) Update(writer io.Writer) error {
 		return errors.Join(errUpdateCaption, err)
 	}
 
-	common.PrintResult(c.Output, res, writer, "Caption updated: %s\n", res.Id)
-	return nil
+	return common.PrintResult(
+		c.Output, res, writer, "Caption updated: %s\n", res.Id,
+	)
 }
 
-func (c *Caption) Delete(writer io.Writer) error {
-	if err := c.EnsureService(); err != nil {
-		return err
+func (c *Caption) Delete(writer io.Writer) (errs error) {
+	if errs = c.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range c.Ids {
 		call := c.Service.Captions.Delete(id)
@@ -237,12 +238,14 @@ func (c *Caption) Delete(writer io.Writer) error {
 
 		err := call.Do()
 		if err != nil {
-			return errors.Join(errDeleteCaption, err)
+			errs = errors.Join(errs, errDeleteCaption, err)
+			continue
 		}
 
-		_, _ = fmt.Fprintf(writer, "Caption %s deleted\n", id)
+		_, err = fmt.Fprintf(writer, "Caption %s deleted\n", id)
+		errs = errors.Join(errs, err)
 	}
-	return nil
+	return errs
 }
 
 func (c *Caption) Download(writer io.Writer) error {

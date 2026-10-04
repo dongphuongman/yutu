@@ -81,14 +81,16 @@ func (pi *PlaylistImage) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
-		pi.Output, playlistImages, writer,
-		table.Row{"ID", "Kind", "Playlist ID", "Type"},
-		func(img *youtube.PlaylistImage) table.Row {
-			return table.Row{img.Id, img.Kind, img.Snippet.PlaylistId, img.Snippet.Type}
-		},
+	return errors.Join(
+		err,
+		common.PrintList(
+			pi.Output, playlistImages, writer,
+			table.Row{"ID", "Kind", "Playlist ID", "Type"},
+			func(img *youtube.PlaylistImage) table.Row {
+				return table.Row{img.Id, img.Kind, img.Snippet.PlaylistId, img.Snippet.Type}
+			},
+		),
 	)
-	return err
 }
 
 func (pi *PlaylistImage) Insert(writer io.Writer) error {
@@ -125,10 +127,9 @@ func (pi *PlaylistImage) Insert(writer io.Writer) error {
 		return errors.Join(errInsertPlaylistImage, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		pi.Output, res, writer, "PlaylistImage inserted: %s\n", res.Id,
 	)
-	return nil
 }
 
 func (pi *PlaylistImage) Update(writer io.Writer) error {
@@ -177,15 +178,14 @@ func (pi *PlaylistImage) Update(writer io.Writer) error {
 		return errors.Join(errUpdatePlaylistImage, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		pi.Output, res, writer, "PlaylistImage updated: %s\n", res.Id,
 	)
-	return nil
 }
 
-func (pi *PlaylistImage) Delete(writer io.Writer) error {
-	if err := pi.EnsureService(); err != nil {
-		return err
+func (pi *PlaylistImage) Delete(writer io.Writer) (errs error) {
+	if errs = pi.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range pi.Ids {
 		call := pi.Service.PlaylistImages.Delete()
@@ -196,11 +196,13 @@ func (pi *PlaylistImage) Delete(writer io.Writer) error {
 
 		err := call.Do()
 		if err != nil {
-			return errors.Join(errDeletePlaylistImage, err)
+			errs = errors.Join(errs, errDeletePlaylistImage, err)
+			continue
 		}
-		_, _ = fmt.Fprintf(writer, "PlaylistImage %s deleted\n", id)
+		_, err = fmt.Fprintf(writer, "PlaylistImage %s deleted\n", id)
+		errs = errors.Join(errs, err)
 	}
-	return nil
+	return errs
 }
 
 func WithHeight(height int64) Option {

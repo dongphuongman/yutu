@@ -6,10 +6,12 @@ package liveChatMessage
 import (
 	"bytes"
 	"encoding/json/v2"
+	"errors"
 	"io"
 	"math"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/eat-pray-ai/yutu/pkg/common"
@@ -392,6 +394,42 @@ func TestLiveChatMessage_Delete(t *testing.T) {
 	}
 }
 
+func TestLiveChatMessage_Delete_DoesNotReturnEarly(t *testing.T) {
+	var gotIDs []string
+	svc := common.NewTestService(
+		t, http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				id := r.URL.Query().Get("id")
+				gotIDs = append(gotIDs, id)
+
+				if id == "msg-1" {
+					http.Error(w, "server error", http.StatusInternalServerError)
+					return
+				}
+
+				w.WriteHeader(http.StatusNoContent)
+			},
+		),
+	)
+
+	m := NewLiveChatMessage(
+		WithService(svc),
+		WithIds([]string{"msg-1", "msg-2"}),
+	)
+
+	var buf bytes.Buffer
+	err := m.Delete(&buf)
+	if !errors.Is(err, errDeleteLiveChatMessage) {
+		t.Errorf("LiveChatMessage.Delete() error = %v, want %v", err, errDeleteLiveChatMessage)
+	}
+	if !reflect.DeepEqual(gotIDs, []string{"msg-1", "msg-2"}) {
+		t.Errorf("LiveChatMessage.Delete() got IDs = %v, want [msg-1 msg-2]", gotIDs)
+	}
+	if !strings.Contains(buf.String(), "Live chat message msg-2 deleted") {
+		t.Errorf("LiveChatMessage.Delete() output = %q, want successful second delete output", buf.String())
+	}
+}
+
 func TestLiveChatMessage_Transition(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -447,5 +485,43 @@ func TestLiveChatMessage_Transition(t *testing.T) {
 				}
 			},
 		)
+	}
+}
+
+func TestLiveChatMessage_Transition_DoesNotReturnEarly(t *testing.T) {
+	var gotIDs []string
+	svc := common.NewTestService(
+		t, http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				id := r.URL.Query().Get("id")
+				gotIDs = append(gotIDs, id)
+
+				if id == "msg-1" {
+					http.Error(w, "server error", http.StatusInternalServerError)
+					return
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"id": "msg-2"}`))
+			},
+		),
+	)
+
+	m := NewLiveChatMessage(
+		WithService(svc),
+		WithIds([]string{"msg-1", "msg-2"}),
+		WithStatus("closed"),
+	)
+
+	var buf bytes.Buffer
+	err := m.Transition(&buf)
+	if !errors.Is(err, errTransitionLiveChatMessage) {
+		t.Errorf("LiveChatMessage.Transition() error = %v, want %v", err, errTransitionLiveChatMessage)
+	}
+	if !reflect.DeepEqual(gotIDs, []string{"msg-1", "msg-2"}) {
+		t.Errorf("LiveChatMessage.Transition() got IDs = %v, want [msg-1 msg-2]", gotIDs)
+	}
+	if !strings.Contains(buf.String(), "Live chat message msg-2 transitioned") {
+		t.Errorf("LiveChatMessage.Transition() output = %q, want successful second transition output", buf.String())
 	}
 }

@@ -41,7 +41,6 @@ func NewChannelSection(opts ...Option) IChannelSection[youtube.ChannelSection] {
 	return cs
 }
 
-
 func (cs *ChannelSection) Get() (
 	[]*youtube.ChannelSection, error,
 ) {
@@ -78,18 +77,17 @@ func (cs *ChannelSection) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
+	return common.PrintList(
 		cs.Output, channelSections, writer, table.Row{"ID", "Channel ID", "Title"},
 		func(s *youtube.ChannelSection) table.Row {
 			return table.Row{s.Id, s.Snippet.ChannelId, s.Snippet.Title}
 		},
 	)
-	return nil
 }
 
-func (cs *ChannelSection) Delete(writer io.Writer) error {
-	if err := cs.EnsureService(); err != nil {
-		return err
+func (cs *ChannelSection) Delete(writer io.Writer) (errs error) {
+	if errs = cs.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range cs.Ids {
 		call := cs.Service.ChannelSections.Delete(id)
@@ -99,12 +97,14 @@ func (cs *ChannelSection) Delete(writer io.Writer) error {
 
 		err := call.Do()
 		if err != nil {
-			return errors.Join(errDeleteChannelSection, err)
+			errs = errors.Join(errs, errDeleteChannelSection, err)
+			continue
 		}
 
-		_, _ = fmt.Fprintf(writer, "Channel section %s deleted\n", id)
+		_, err = fmt.Fprintf(writer, "Channel section %s deleted\n", id)
+		errs = errors.Join(errs, err)
 	}
-	return nil
+	return errs
 }
 
 func WithMine(mine *bool) Option {

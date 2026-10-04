@@ -89,19 +89,21 @@ func (p *Playlist) List(writer io.Writer) error {
 		return err
 	}
 
-	common.PrintList(
-		p.Output, playlists, writer, table.Row{"ID", "Channel ID", "Title"},
-		func(pl *youtube.Playlist) table.Row {
-			channelId := ""
-			title := ""
-			if pl.Snippet != nil {
-				channelId = pl.Snippet.ChannelId
-				title = pl.Snippet.Title
-			}
-			return table.Row{pl.Id, channelId, title}
-		},
+	return errors.Join(
+		err,
+		common.PrintList(
+			p.Output, playlists, writer, table.Row{"ID", "Channel ID", "Title"},
+			func(pl *youtube.Playlist) table.Row {
+				channelId := ""
+				title := ""
+				if pl.Snippet != nil {
+					channelId = pl.Snippet.ChannelId
+					title = pl.Snippet.Title
+				}
+				return table.Row{pl.Id, channelId, title}
+			},
+		),
 	)
-	return err
 }
 
 func (p *Playlist) Insert(writer io.Writer) error {
@@ -137,8 +139,9 @@ func (p *Playlist) Insert(writer io.Writer) error {
 		return errors.Join(errInsertPlaylist, err)
 	}
 
-	common.PrintResult(p.Output, res, writer, "Playlist inserted: %s\n", res.Id)
-	return nil
+	return common.PrintResult(
+		p.Output, res, writer, "Playlist inserted: %s\n", res.Id,
+	)
 }
 
 func (p *Playlist) Update(writer io.Writer) error {
@@ -179,13 +182,14 @@ func (p *Playlist) Update(writer io.Writer) error {
 		return errors.Join(errUpdatePlaylist, err)
 	}
 
-	common.PrintResult(p.Output, res, writer, "Playlist updated: %s\n", res.Id)
-	return nil
+	return common.PrintResult(
+		p.Output, res, writer, "Playlist updated: %s\n", res.Id,
+	)
 }
 
-func (p *Playlist) Delete(writer io.Writer) error {
-	if err := p.EnsureService(); err != nil {
-		return err
+func (p *Playlist) Delete(writer io.Writer) (errs error) {
+	if errs = p.EnsureService(); errs != nil {
+		return errs
 	}
 	for _, id := range p.Ids {
 		call := p.Service.Playlists.Delete(id)
@@ -195,11 +199,13 @@ func (p *Playlist) Delete(writer io.Writer) error {
 
 		err := call.Do()
 		if err != nil {
-			return errors.Join(errDeletePlaylist, err)
+			errs = errors.Join(errs, errDeletePlaylist, err)
+			continue
 		}
-		_, _ = fmt.Fprintf(writer, "Playlist %s deleted", id)
+		_, err = fmt.Fprintf(writer, "Playlist %s deleted", id)
+		errs = errors.Join(errs, err)
 	}
-	return nil
+	return errs
 }
 
 func WithTitle(title string) Option {
