@@ -167,34 +167,38 @@ func WithOnBehalfOfContentOwner[T HasFields](owner string) func(T) {
 
 // PrintList handles the json/yaml/table output switch for List methods.
 // The header and row function are only used for table output.
-func PrintList[T any](output string, items []*T, w io.Writer, header table.Row, row func(*T) table.Row) {
+func PrintList[T any](output string, items []*T, w io.Writer, header table.Row, row func(*T) table.Row) error {
 	switch output {
 	case "json":
-		utils.PrintJSON(items, w)
+		return utils.PrintJSON(items, w)
 	case "yaml":
-		utils.PrintYAML(items, w)
+		return utils.PrintYAML(items, w)
 	case "table":
 		tb := table.NewWriter()
-		defer tb.Render()
-		tb.SetOutputMirror(w)
 		tb.SetStyle(pkg.TableStyle)
 		tb.AppendHeader(header)
 		for _, item := range items {
 			tb.AppendRow(row(item))
 		}
+		_, err := fmt.Fprint(w, tb.Render())
+		return err
+	default:
+		return nil
 	}
 }
 
 // PrintResult handles the json/yaml/silent/default output switch for mutation methods.
-func PrintResult(output string, data any, w io.Writer, format string, args ...any) {
+func PrintResult(output string, data any, w io.Writer, format string, args ...any) error {
 	switch output {
 	case "json":
-		utils.PrintJSON(data, w)
+		return utils.PrintJSON(data, w)
 	case "yaml":
-		utils.PrintYAML(data, w)
+		return utils.PrintYAML(data, w)
 	case "silent":
+		return nil
 	default:
-		_, _ = fmt.Fprintf(w, format, args...)
+		_, err := fmt.Fprintf(w, format, args...)
+		return err
 	}
 }
 

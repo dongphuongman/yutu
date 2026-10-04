@@ -5,6 +5,7 @@ package common
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -199,11 +200,29 @@ func TestPrintList(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			PrintList(tt.output, items, &buf, header, rowFn)
+			if err := PrintList(tt.output, items, &buf, header, rowFn); err != nil {
+				t.Fatalf("PrintList(%q) error = %v", tt.output, err)
+			}
 			if buf.Len() == 0 {
 				t.Errorf("PrintList(%q) produced empty output", tt.output)
 			}
 		})
+	}
+}
+
+type errWriter struct{}
+
+func (errWriter) Write([]byte) (int, error) {
+	return 0, errors.New("write failed")
+}
+
+func TestPrintList_WriteError(t *testing.T) {
+	items := []*youtube.Video{{Id: "v1"}}
+	header := table.Row{"ID"}
+	rowFn := func(v *youtube.Video) table.Row { return table.Row{v.Id} }
+
+	if err := PrintList("table", items, errWriter{}, header, rowFn); err == nil {
+		t.Fatal("expected table write error, got nil")
 	}
 }
 
@@ -244,7 +263,9 @@ func TestPrintResult(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			PrintResult(tt.output, data, &buf, "Video %s updated", "v1")
+			if err := PrintResult(tt.output, data, &buf, "Video %s updated", "v1"); err != nil {
+				t.Fatalf("PrintResult(%q) error = %v", tt.output, err)
+			}
 			if tt.wantEmpty && buf.Len() != 0 {
 				t.Errorf("PrintResult(%q) should produce no output, got %q", tt.output, buf.String())
 			}
@@ -258,6 +279,12 @@ func TestPrintResult(t *testing.T) {
 	}
 }
 
+func TestPrintResult_WriteError(t *testing.T) {
+	if err := PrintResult("", nil, errWriter{}, "Video %s updated", "v1"); err == nil {
+		t.Fatal("expected default output write error, got nil")
+	}
+}
+
 // ---------- TestSetContext ----------
 
 func TestSetContext(t *testing.T) {
@@ -268,7 +295,6 @@ func TestSetContext(t *testing.T) {
 		t.Error("SetContext did not set context")
 	}
 }
-
 
 // ---------- TestEnsureService ----------
 

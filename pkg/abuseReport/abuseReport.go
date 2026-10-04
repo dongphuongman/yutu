@@ -69,10 +69,9 @@ func (r *AbuseReport) Insert(writer io.Writer) error {
 		return errors.Join(errInsertAbuseReport, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		r.Output, res, writer, "Abuse report submitted\n",
 	)
-	return nil
 }
 
 func WithAbuseTypes(abuseTypes []string) Option {

@@ -61,10 +61,9 @@ func (cb *ChannelBanner) Insert(writer io.Writer) error {
 		return errors.Join(errInsertChannelBanner, err)
 	}
 
-	common.PrintResult(
+	return common.PrintResult(
 		cb.Output, res, writer, "ChannelBanner inserted: %s\n", res.Url,
 	)
-	return nil
 }
 
 func WithFile(file string) Option {

@@ -169,7 +169,9 @@ func TestPrintJSON(t *testing.T) {
 				defer func() { IsInteractive = orig }()
 
 				writer := &bytes.Buffer{}
-				PrintJSON(tt.data, writer)
+				if err := PrintJSON(tt.data, writer); err != nil {
+					t.Fatalf("PrintJSON() error = %v", err)
+				}
 				if gotWriter := writer.String(); gotWriter != tt.wantWriter {
 					t.Errorf("PrintJSON() = %v, want %v", gotWriter, tt.wantWriter)
 				}
@@ -199,12 +201,45 @@ func TestPrintYAML(t *testing.T) {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				writer := &bytes.Buffer{}
-				PrintYAML(tt.data, writer)
+				if err := PrintYAML(tt.data, writer); err != nil {
+					t.Fatalf("PrintYAML() error = %v", err)
+				}
 				if gotWriter := writer.String(); gotWriter != tt.wantWriter {
 					t.Errorf("PrintYAML() = %v, want %v", gotWriter, tt.wantWriter)
 				}
 			},
 		)
+	}
+}
+
+func TestPrintJSON_Error(t *testing.T) {
+	if err := PrintJSON(func() {}, &bytes.Buffer{}); err == nil {
+		t.Fatal("expected marshal error, got nil")
+	}
+}
+
+func TestPrintYAML_Error(t *testing.T) {
+	data := func() {}
+	if err := PrintYAML(data, &bytes.Buffer{}); err == nil {
+		t.Fatal("expected marshal error, got nil")
+	}
+}
+
+type errWriter struct{}
+
+func (errWriter) Write([]byte) (int, error) {
+	return 0, errors.New("write failed")
+}
+
+func TestPrintJSON_WriteError(t *testing.T) {
+	if err := PrintJSON(map[string]string{"key": "value"}, errWriter{}); err == nil {
+		t.Fatal("expected write error, got nil")
+	}
+}
+
+func TestPrintYAML_WriteError(t *testing.T) {
+	if err := PrintYAML(map[string]string{"key": "value"}, errWriter{}); err == nil {
+		t.Fatal("expected write error, got nil")
 	}
 }
 
@@ -298,8 +333,14 @@ func TestExtractHl(t *testing.T) {
 }
 
 func TestRandomStage(t *testing.T) {
-	s1 := RandomStage()
-	s2 := RandomStage()
+	s1, err := RandomStage()
+	if err != nil {
+		t.Fatalf("RandomStage() error = %v", err)
+	}
+	s2, err := RandomStage()
+	if err != nil {
+		t.Fatalf("RandomStage() error = %v", err)
+	}
 	if s1 == "" {
 		t.Error("RandomStage() returned empty string")
 	}

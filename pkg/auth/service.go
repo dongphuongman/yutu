@@ -58,7 +58,12 @@ func NewY2BService(opts ...Option) Svc {
 	s.ctx = context.Background()
 	s.credFile = "client_secret.json"
 	s.timeout = defaultCallbackTimeout
-	s.state = utils.RandomStage()
+	state, err := utils.RandomStage()
+	if err != nil {
+		s.initErr = err
+	} else {
+		s.state = state
+	}
 	s.in = os.Stdin
 	s.out = os.Stdout
 
@@ -93,12 +98,11 @@ func WithIO(in io.Reader, out io.Writer) Option {
 	}
 }
 
-func (s *svc) openURL(url string) error {
+func (s *svc) openURL(url string) (err error) {
 	if s.openURLFunc != nil {
 		return s.openURLFunc(url)
 	}
 
-	var err error
 	switch runtime.GOOS {
 	case "windows":
 		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()

@@ -34,26 +34,43 @@ var IsInteractive = func(v any) bool {
 	return false
 }
 
-func PrintJSON(data any, writer io.Writer) {
+func PrintJSON(data any, writer io.Writer) (err error) {
 	var marshalled []byte
 	if IsInteractive(writer) {
-		marshalled, _ = json.Marshal(data, jsontext.WithIndent("  "))
+		marshalled, err = json.Marshal(data, jsontext.WithIndent("  "))
 	} else {
-		marshalled, _ = json.Marshal(data)
+		marshalled, err = json.Marshal(data)
 	}
-	_, _ = fmt.Fprintln(writer, string(marshalled))
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+	_, err = fmt.Fprintln(writer, string(marshalled))
+	return err
 }
 
-func PrintYAML(data any, writer io.Writer) {
-	marshalled, _ := yaml.Marshal(data)
-	_, _ = fmt.Fprintln(writer, string(marshalled))
+func PrintYAML(data any, writer io.Writer) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			// yaml.v3 may panic for unsupported values (for example, functions).
+			// Preserve this as an ordinary error for CLI callers.
+			err = fmt.Errorf("failed to marshal YAML: %v", r)
+		}
+	}()
+	marshalled, err := yaml.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal YAML: %w", err)
+	}
+	_, err = fmt.Fprintln(writer, string(marshalled))
+	return err
 }
 
-func RandomStage() string {
+func RandomStage() (string, error) {
 	b := make([]byte, 128)
-	_, _ = rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to generate random state: %w", err)
+	}
 	state := base64.URLEncoding.EncodeToString(b)
-	return state
+	return state, nil
 }
 
 func GetFileName(file string) string {
