@@ -90,11 +90,11 @@ var rateCmd = &cobra.Command{
 			c, fmt.Sprintf(rateConfirm, strings.Join(ids, ", "), rating),
 		)
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		input := video.NewVideo(
 			video.WithIds(ids),
 			video.WithRating(rating),
 		)
-		utils.HandleCmdError(input.Rate(c.OutOrStdout()), c)
+		return input.Rate(c.OutOrStdout())
 	},
 }

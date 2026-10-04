@@ -105,7 +105,7 @@ var updateCmd = &cobra.Command{
 			c, fmt.Sprintf(updateConfirm, strings.Join(ids, ", ")),
 		)
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		p := playlist.NewPlaylist(
 			playlist.WithIds(ids),
@@ -116,6 +116,6 @@ var updateCmd = &cobra.Command{
 			playlist.WithPrivacy(privacy),
 			playlist.WithOutput(output),
 		)
-		utils.HandleCmdError(p.Update(c.OutOrStdout()), c)
+		return p.Update(c.OutOrStdout())
 	},
 }

@@ -11,7 +11,6 @@ go_library(
     deps = [
         "//cmd",
         "//pkg",
-        "//pkg/utils",
         "//pkg/videoAbuseReportReason",
         "@com_github_eat_pray_ai_cobra_mcp//:cobra-mcp",
         "@com_github_google_jsonschema_go//jsonschema",

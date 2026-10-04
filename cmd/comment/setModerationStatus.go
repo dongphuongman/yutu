@@ -103,7 +103,7 @@ var setModerationStatusCmd = &cobra.Command{
 			c, fmt.Sprintf(smsConfirm, strings.Join(ids, ", "), moderationStatus),
 		)
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := comment.NewComment(
 			comment.WithIds(ids),
@@ -111,6 +111,6 @@ var setModerationStatusCmd = &cobra.Command{
 			comment.WithBanAuthor(banAuthor),
 			comment.WithOutput(output),
 		)
-		utils.HandleCmdError(input.SetModerationStatus(c.OutOrStdout()), c)
+		return input.SetModerationStatus(c.OutOrStdout())
 	},
 }

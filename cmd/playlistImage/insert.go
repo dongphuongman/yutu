@@ -110,7 +110,7 @@ var insertCmd = &cobra.Command{
 	PreRunE: func(c *cobra.Command, _ []string) error {
 		return utils.ConfirmPreRun(c, fmt.Sprintf(insertConfirm, file, playlistId))
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		pi := playlistImage.NewPlaylistImage(
 			playlistImage.WithFile(file),
@@ -123,6 +123,6 @@ var insertCmd = &cobra.Command{
 			playlistImage.WithOnBehalfOfContentOwnerChannel(onBehalfOfContentOwnerChannel),
 		)
 		err := pi.Insert(c.OutOrStdout())
-		utils.HandleCmdError(err, c)
+		return err
 	},
 }

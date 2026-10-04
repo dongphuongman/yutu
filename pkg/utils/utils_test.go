@@ -6,7 +6,6 @@ package utils
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"reflect"
@@ -385,58 +384,6 @@ func TestConfirmPreRun(t *testing.T) {
 				err := ConfirmPreRun(cmd, "Would do something")
 				if !errors.Is(err, tt.wantErr) {
 					t.Errorf("ConfirmPreRun() error = %v, want %v", err, tt.wantErr)
-				}
-			},
-		)
-	}
-}
-
-func TestHandleCmdError(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   error
-		wantOut string
-		wantErr string
-	}{
-		{
-			name:    "with error",
-			input:   fmt.Errorf("some error"),
-			wantOut: "help called",
-			wantErr: "Error: some error\n",
-		},
-		{
-			name:    "without error",
-			input:   nil,
-			wantOut: "",
-			wantErr: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(
-			tt.name, func(t *testing.T) {
-				cmd := &cobra.Command{Use: "test"}
-				var outBuf, errBuf bytes.Buffer
-				cmd.SetOut(&outBuf)
-				cmd.SetErr(&errBuf)
-				cmd.SetHelpFunc(
-					func(c *cobra.Command, _ []string) {
-						_, _ = fmt.Fprint(c.OutOrStdout(), "help called")
-					},
-				)
-
-				HandleCmdError(tt.input, cmd)
-
-				if gotOut := outBuf.String(); gotOut != tt.wantOut {
-					t.Fatalf(
-						"unexpected stdout output, got %q, want %q", gotOut, tt.wantOut,
-					)
-				}
-
-				if gotErr := errBuf.String(); gotErr != tt.wantErr {
-					t.Fatalf(
-						"unexpected stderr output, got %q, want %q", gotErr, tt.wantErr,
-					)
 				}
 			},
 		)

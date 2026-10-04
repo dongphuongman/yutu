@@ -10,7 +10,6 @@ import (
 	cobramcp "github.com/eat-pray-ai/cobra-mcp"
 	"github.com/eat-pray-ai/yutu/cmd"
 	"github.com/eat-pray-ai/yutu/pkg"
-	"github.com/eat-pray-ai/yutu/pkg/utils"
 	"github.com/eat-pray-ai/yutu/pkg/video"
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -75,7 +74,7 @@ var getRatingCmd = &cobra.Command{
 	Short:   getRatingShort,
 	Long:    getRatingLong,
 	Example: getRatingExample,
-	Run: func(cmd *cobra.Command, _ []string) {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		output, _ := cmd.Flags().GetString("output")
 		input := video.NewVideo(
 			video.WithIds(ids),
@@ -83,6 +82,6 @@ var getRatingCmd = &cobra.Command{
 			video.WithOutput(output),
 			video.WithService(nil),
 		)
-		utils.HandleCmdError(input.GetRating(cmd.OutOrStdout()), cmd)
+		return input.GetRating(cmd.OutOrStdout())
 	},
 }

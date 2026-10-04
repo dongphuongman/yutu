@@ -4,6 +4,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -21,9 +22,10 @@ Environment variables:
 )
 
 var RootCmd = &cobra.Command{
-	Use:   "yutu",
-	Short: short,
-	Long:  long,
+	Use:          "yutu",
+	Short:        short,
+	Long:         long,
+	SilenceUsage: true,
 
 	Run: func(cmd *cobra.Command, _ []string) {
 		_ = cmd.Help()
@@ -31,8 +33,14 @@ var RootCmd = &cobra.Command{
 }
 
 func Execute() {
-	err := RootCmd.Execute()
+	cmd, err := RootCmd.ExecuteC()
 	if err != nil {
+		if cmd == nil {
+			cmd = RootCmd
+		}
+		_, _ = fmt.Fprintf(
+			cmd.ErrOrStderr(), "Run '%s -h' to see usage.\n", cmd.CommandPath(),
+		)
 		os.Exit(1)
 	}
 }

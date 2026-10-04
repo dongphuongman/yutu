@@ -110,7 +110,7 @@ var bindCmd = &cobra.Command{
 			c, fmt.Sprintf(bindConfirm, strings.Join(ids, ", "), streamId),
 		)
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := liveBroadcast.NewLiveBroadcast(
 			liveBroadcast.WithIds(ids),
@@ -120,6 +120,6 @@ var bindCmd = &cobra.Command{
 			liveBroadcast.WithParts(parts),
 			liveBroadcast.WithOutput(output),
 		)
-		utils.HandleCmdError(input.Bind(c.OutOrStdout()), c)
+		return input.Bind(c.OutOrStdout())
 	},
 }

@@ -85,12 +85,12 @@ var deleteCmd = &cobra.Command{
 			c, fmt.Sprintf(deleteConfirm, strings.Join(ids, ", ")),
 		)
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		input := caption.NewCaption(
 			caption.WithIds(ids),
 			caption.WithOnBehalfOf(onBehalfOf),
 			caption.WithOnBehalfOfContentOwner(onBehalfOfContentOwner),
 		)
-		utils.HandleCmdError(input.Delete(c.OutOrStdout()), c)
+		return input.Delete(c.OutOrStdout())
 	},
 }

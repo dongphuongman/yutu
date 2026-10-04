@@ -84,12 +84,12 @@ var markAsSpamCmd = &cobra.Command{
 			c, fmt.Sprintf(masConfirm, strings.Join(ids, ", ")),
 		)
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := comment.NewComment(
 			comment.WithIds(ids),
 			comment.WithOutput(output),
 		)
-		utils.HandleCmdError(input.MarkAsSpam(c.OutOrStdout()), c)
+		return input.MarkAsSpam(c.OutOrStdout())
 	},
 }

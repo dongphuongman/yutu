@@ -128,11 +128,3 @@ func ConfirmPreRun(cmd *cobra.Command, msg string) error {
 	}
 	return nil
 }
-
-func HandleCmdError(err error, cmd *cobra.Command) {
-	if err == nil {
-		return
-	}
-	_ = cmd.Help()
-	cmd.PrintErrf("Error: %v\n", err)
-}

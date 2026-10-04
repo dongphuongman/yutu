@@ -97,7 +97,7 @@ var setCmd = &cobra.Command{
 	PreRunE: func(c *cobra.Command, _ []string) error {
 		return utils.ConfirmPreRun(c, fmt.Sprintf(setConfirm, file, channelId))
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		input := watermark.NewWatermark(
 			watermark.WithChannelId(channelId),
 			watermark.WithFile(file),
@@ -107,6 +107,6 @@ var setCmd = &cobra.Command{
 			watermark.WithOffsetType(offsetType),
 			watermark.WithOnBehalfOfContentOwner(onBehalfOfContentOwner),
 		)
-		utils.HandleCmdError(input.Set(c.OutOrStdout()), c)
+		return input.Set(c.OutOrStdout())
 	},
 }

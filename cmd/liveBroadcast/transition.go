@@ -118,7 +118,7 @@ var transitionCmd = &cobra.Command{
 			fmt.Sprintf(transitionConfirm, strings.Join(ids, ", "), broadcastStatus),
 		)
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := liveBroadcast.NewLiveBroadcast(
 			liveBroadcast.WithIds(ids),
@@ -128,6 +128,6 @@ var transitionCmd = &cobra.Command{
 			liveBroadcast.WithParts(parts),
 			liveBroadcast.WithOutput(output),
 		)
-		utils.HandleCmdError(input.Transition(c.OutOrStdout()), c)
+		return input.Transition(c.OutOrStdout())
 	},
 }

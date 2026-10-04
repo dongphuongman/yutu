@@ -10,7 +10,6 @@ import (
 	"github.com/eat-pray-ai/yutu/cmd"
 	"github.com/eat-pray-ai/yutu/pkg"
 	"github.com/eat-pray-ai/yutu/pkg/caption"
-	"github.com/eat-pray-ai/yutu/pkg/utils"
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
@@ -87,7 +86,7 @@ var downloadCmd = &cobra.Command{
 	Short:   downloadShort,
 	Long:    downloadLong,
 	Example: downloadExample,
-	Run: func(cmd *cobra.Command, _ []string) {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		input := caption.NewCaption(
 			caption.WithIds(ids),
 			caption.WithFile(file),
@@ -96,6 +95,6 @@ var downloadCmd = &cobra.Command{
 			caption.WithOnBehalfOf(onBehalfOf),
 			caption.WithOnBehalfOfContentOwner(onBehalfOfContentOwner),
 		)
-		utils.HandleCmdError(input.Download(cmd.OutOrStdout()), cmd)
+		return input.Download(cmd.OutOrStdout())
 	},
 }

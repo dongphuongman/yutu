@@ -11,7 +11,6 @@ import (
 	"github.com/eat-pray-ai/yutu/cmd"
 	"github.com/eat-pray-ai/yutu/pkg"
 	"github.com/eat-pray-ai/yutu/pkg/caption"
-	"github.com/eat-pray-ai/yutu/pkg/utils"
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
@@ -88,7 +87,7 @@ var listCmd = &cobra.Command{
 	Short:   listShort,
 	Long:    listLong,
 	Example: listExample,
-	Run: func(cmd *cobra.Command, _ []string) {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		output, _ := cmd.Flags().GetString("output")
 		input := caption.NewCaption(
 			caption.WithIds(ids),
@@ -98,6 +97,6 @@ var listCmd = &cobra.Command{
 			caption.WithParts(parts),
 			caption.WithOutput(output),
 		)
-		utils.HandleCmdError(input.List(cmd.OutOrStdout()), cmd)
+		return input.List(cmd.OutOrStdout())
 	},
 }

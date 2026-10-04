@@ -114,7 +114,7 @@ var updateCmd = &cobra.Command{
 			c, fmt.Sprintf(updateConfirm, strings.Join(ids, ", ")),
 		)
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := liveBroadcast.NewLiveBroadcast(
 			liveBroadcast.WithIds(ids),
@@ -128,6 +128,6 @@ var updateCmd = &cobra.Command{
 			liveBroadcast.WithMaxResults(1),
 			liveBroadcast.WithOutput(output),
 		)
-		utils.HandleCmdError(input.Update(c.OutOrStdout()), c)
+		return input.Update(c.OutOrStdout())
 	},
 }

@@ -94,7 +94,7 @@ var updateCmd = &cobra.Command{
 	PreRunE: func(c *cobra.Command, _ []string) error {
 		return utils.ConfirmPreRun(c, fmt.Sprintf(updateConfirm, linkingToken))
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := thirdPartyLink.NewThirdPartyLink(
 			thirdPartyLink.WithLinkingToken(linkingToken),
@@ -104,6 +104,6 @@ var updateCmd = &cobra.Command{
 			thirdPartyLink.WithParts(parts),
 			thirdPartyLink.WithOutput(output),
 		)
-		utils.HandleCmdError(input.Update(c.OutOrStdout()), c)
+		return input.Update(c.OutOrStdout())
 	},
 }

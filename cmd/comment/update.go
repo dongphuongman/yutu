@@ -100,7 +100,7 @@ var updateCmd = &cobra.Command{
 			c, fmt.Sprintf(updateConfirm, strings.Join(ids, ", ")),
 		)
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := comment.NewComment(
 			comment.WithIds(ids),
@@ -109,6 +109,6 @@ var updateCmd = &cobra.Command{
 			comment.WithViewerRating(viewerRating),
 			comment.WithOutput(output),
 		)
-		utils.HandleCmdError(input.Update(c.OutOrStdout()), c)
+		return input.Update(c.OutOrStdout())
 	},
 }

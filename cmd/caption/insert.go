@@ -123,7 +123,7 @@ var insertCmd = &cobra.Command{
 	PreRunE: func(c *cobra.Command, _ []string) error {
 		return utils.ConfirmPreRun(c, fmt.Sprintf(insertConfirm, videoId, file))
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := caption.NewCaption(
 			caption.WithFile(file),
@@ -141,6 +141,6 @@ var insertCmd = &cobra.Command{
 			caption.WithOnBehalfOfContentOwner(onBehalfOfContentOwner),
 			caption.WithOutput(output),
 		)
-		utils.HandleCmdError(input.Insert(c.OutOrStdout()), c)
+		return input.Insert(c.OutOrStdout())
 	},
 }

@@ -106,7 +106,7 @@ var insertCmd = &cobra.Command{
 			c, fmt.Sprintf(insertConfirm, bannedUserChannelId, liveChatId),
 		)
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := liveChatBan.NewLiveChatBan(
 			liveChatBan.WithLiveChatId(liveChatId),
@@ -116,6 +116,6 @@ var insertCmd = &cobra.Command{
 			liveChatBan.WithParts(parts),
 			liveChatBan.WithOutput(output),
 		)
-		utils.HandleCmdError(input.Insert(c.OutOrStdout()), c)
+		return input.Insert(c.OutOrStdout())
 	},
 }

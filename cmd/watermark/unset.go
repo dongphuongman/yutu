@@ -70,8 +70,8 @@ var unsetCmd = &cobra.Command{
 	PreRunE: func(c *cobra.Command, _ []string) error {
 		return utils.ConfirmPreRun(c, fmt.Sprintf(unsetConfirm, channelId))
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		input := watermark.NewWatermark(watermark.WithChannelId(channelId))
-		utils.HandleCmdError(input.Unset(c.OutOrStdout()), c)
+		return input.Unset(c.OutOrStdout())
 	},
 }

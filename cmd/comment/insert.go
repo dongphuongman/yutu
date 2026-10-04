@@ -100,7 +100,7 @@ var insertCmd = &cobra.Command{
 	PreRunE: func(c *cobra.Command, _ []string) error {
 		return utils.ConfirmPreRun(c, fmt.Sprintf(insertConfirm, parentId))
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := comment.NewComment(
 			comment.WithAuthorChannelId(authorChannelId),
@@ -111,6 +111,6 @@ var insertCmd = &cobra.Command{
 			comment.WithVideoId(videoId),
 			comment.WithOutput(output),
 		)
-		utils.HandleCmdError(input.Insert(c.OutOrStdout()), c)
+		return input.Insert(c.OutOrStdout())
 	},
 }

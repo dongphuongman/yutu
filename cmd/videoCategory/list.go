@@ -47,7 +47,7 @@ var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: listShort,
 	Long:  listLong,
-	Run: func(cmd *cobra.Command, _ []string) {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		output, _ := cmd.Flags().GetString("output")
 		input := videoCategory.NewVideoCategory(
 			videoCategory.WithIds(ids),
@@ -56,7 +56,7 @@ var listCmd = &cobra.Command{
 			videoCategory.WithParts(parts),
 			videoCategory.WithOutput(output),
 		)
-		utils.HandleCmdError(input.List(cmd.OutOrStdout()), cmd)
+		return input.List(cmd.OutOrStdout())
 	},
 }
 

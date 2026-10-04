@@ -102,7 +102,7 @@ var reportAbuseCmd = &cobra.Command{
 			c, fmt.Sprintf(reportAbuseConfirm, strings.Join(ids, ", ")),
 		)
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		input := video.NewVideo(
 			video.WithIds(ids),
 			video.WithReasonId(reasonId),
@@ -111,6 +111,6 @@ var reportAbuseCmd = &cobra.Command{
 			video.WithLanguage(language),
 			video.WithOnBehalfOfContentOwner(onBehalfOfContentOwner),
 		)
-		utils.HandleCmdError(input.ReportAbuse(c.OutOrStdout()), c)
+		return input.ReportAbuse(c.OutOrStdout())
 	},
 }

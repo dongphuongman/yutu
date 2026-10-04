@@ -92,13 +92,13 @@ var transitionCmd = &cobra.Command{
 			c, fmt.Sprintf(transitionConfirm, strings.Join(ids, ", "), status),
 		)
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := liveChatMessage.NewLiveChatMessage(
 			liveChatMessage.WithIds(ids),
 			liveChatMessage.WithStatus(status),
 			liveChatMessage.WithOutput(output),
 		)
-		utils.HandleCmdError(input.Transition(c.OutOrStdout()), c)
+		return input.Transition(c.OutOrStdout())
 	},
 }

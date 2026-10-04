@@ -81,13 +81,13 @@ var setCmd = &cobra.Command{
 	PreRunE: func(c *cobra.Command, _ []string) error {
 		return utils.ConfirmPreRun(c, fmt.Sprintf(setConfirm, file, videoId))
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := thumbnail.NewThumbnail(
 			thumbnail.WithFile(file),
 			thumbnail.WithVideoId(videoId),
 			thumbnail.WithOutput(output),
 		)
-		utils.HandleCmdError(input.Set(c.OutOrStdout()), c)
+		return input.Set(c.OutOrStdout())
 	},
 }

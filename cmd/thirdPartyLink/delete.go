@@ -80,12 +80,12 @@ var deleteCmd = &cobra.Command{
 	PreRunE: func(c *cobra.Command, _ []string) error {
 		return utils.ConfirmPreRun(c, fmt.Sprintf(deleteConfirm, linkingToken))
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		input := thirdPartyLink.NewThirdPartyLink(
 			thirdPartyLink.WithLinkingToken(linkingToken),
 			thirdPartyLink.WithType(linkType),
 			thirdPartyLink.WithExternalChannelId(externalChannelId),
 		)
-		utils.HandleCmdError(input.Delete(c.OutOrStdout()), c)
+		return input.Delete(c.OutOrStdout())
 	},
 }

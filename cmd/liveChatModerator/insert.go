@@ -92,7 +92,7 @@ var insertCmd = &cobra.Command{
 			c, fmt.Sprintf(insertConfirm, moderatorChannelId, liveChatId),
 		)
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := liveChatModerator.NewLiveChatModerator(
 			liveChatModerator.WithLiveChatId(liveChatId),
@@ -100,6 +100,6 @@ var insertCmd = &cobra.Command{
 			liveChatModerator.WithParts(parts),
 			liveChatModerator.WithOutput(output),
 		)
-		utils.HandleCmdError(input.Insert(c.OutOrStdout()), c)
+		return input.Insert(c.OutOrStdout())
 	},
 }

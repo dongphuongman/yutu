@@ -103,7 +103,7 @@ var updateCmd = &cobra.Command{
 	PreRunE: func(c *cobra.Command, _ []string) error {
 		return utils.ConfirmPreRun(c, fmt.Sprintf(updateConfirm, playlistId))
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := playlistImage.NewPlaylistImage(
 			playlistImage.WithPlaylistId(playlistId),
@@ -115,6 +115,6 @@ var updateCmd = &cobra.Command{
 			playlistImage.WithOnBehalfOfContentOwner(onBehalfOfContentOwner),
 			playlistImage.WithOnBehalfOfContentOwnerChannel(onBehalfOfContentOwnerChannel),
 		)
-		utils.HandleCmdError(input.Update(c.OutOrStdout()), c)
+		return input.Update(c.OutOrStdout())
 	},
 }

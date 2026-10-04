@@ -100,7 +100,7 @@ var updateCmd = &cobra.Command{
 			c, fmt.Sprintf(updateConfirm, strings.Join(ids, ", ")),
 		)
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := playlistItem.NewPlaylistItem(
 			playlistItem.WithIds(ids),
@@ -110,6 +110,6 @@ var updateCmd = &cobra.Command{
 			playlistItem.WithOnBehalfOfContentOwner(onBehalfOfContentOwner),
 			playlistItem.WithOutput(output),
 		)
-		utils.HandleCmdError(input.Update(c.OutOrStdout()), c)
+		return input.Update(c.OutOrStdout())
 	},
 }

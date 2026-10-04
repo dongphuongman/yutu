@@ -112,7 +112,7 @@ var insertCmd = &cobra.Command{
 			c, fmt.Sprintf(insertConfirm, subjectTypeId, subjectId),
 		)
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := abuseReport.NewAbuseReport(
 			abuseReport.WithAbuseTypes(abuseTypes),
@@ -124,6 +124,6 @@ var insertCmd = &cobra.Command{
 			abuseReport.WithParts(parts),
 			abuseReport.WithOutput(output),
 		)
-		utils.HandleCmdError(input.Insert(c.OutOrStdout()), c)
+		return input.Insert(c.OutOrStdout())
 	},
 }

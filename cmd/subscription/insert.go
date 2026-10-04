@@ -88,7 +88,7 @@ var insertCmd = &cobra.Command{
 	PreRunE: func(c *cobra.Command, _ []string) error {
 		return utils.ConfirmPreRun(c, fmt.Sprintf(insertConfirm, channelId))
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := subscription.NewSubscription(
 			subscription.WithSubscriberChannelId(subscriberChannelId),
@@ -97,6 +97,6 @@ var insertCmd = &cobra.Command{
 			subscription.WithTitle(title),
 			subscription.WithOutput(output),
 		)
-		utils.HandleCmdError(input.Insert(c.OutOrStdout()), c)
+		return input.Insert(c.OutOrStdout())
 	},
 }

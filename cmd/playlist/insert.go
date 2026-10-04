@@ -99,7 +99,7 @@ var insertCmd = &cobra.Command{
 	PreRunE: func(c *cobra.Command, _ []string) error {
 		return utils.ConfirmPreRun(c, fmt.Sprintf(insertConfirm, title))
 	},
-	Run: func(c *cobra.Command, _ []string) {
+	RunE: func(c *cobra.Command, _ []string) error {
 		output, _ := c.Flags().GetString("output")
 		input := playlist.NewPlaylist(
 			playlist.WithTitle(title),
@@ -110,6 +110,6 @@ var insertCmd = &cobra.Command{
 			playlist.WithPrivacy(privacy),
 			playlist.WithOutput(output),
 		)
-		utils.HandleCmdError(input.Insert(c.OutOrStdout()), c)
+		return input.Insert(c.OutOrStdout())
 	},
 }
