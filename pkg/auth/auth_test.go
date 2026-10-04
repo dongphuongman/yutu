@@ -6,11 +6,14 @@ package auth
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -25,12 +28,16 @@ import (
 
 // helper to build a minimal valid Google OAuth2 credential JSON.
 func validCredentialJSON(redirectURL string) string {
+	return validCredentialJSONWithTokenURL(redirectURL, "https://oauth2.googleapis.com/token")
+}
+
+func validCredentialJSONWithTokenURL(redirectURL string, tokenURL string) string {
 	cred := map[string]map[string]any{
 		"installed": {
 			"client_id":                   "test-client-id",
 			"project_id":                  "test-project",
 			"auth_uri":                    "https://accounts.google.com/o/oauth2/auth",
-			"token_uri":                   "https://oauth2.googleapis.com/token",
+			"token_uri":                   tokenURL,
 			"auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
 			"client_secret":               "test-secret",
 			"redirect_uris":               []string{redirectURL},
@@ -102,6 +109,104 @@ func TestGetConfig_InvalidJSON(t *testing.T) {
 	}
 	if err.Error() == "" {
 		t.Fatalf("expected non-empty error message")
+	}
+}
+
+func TestGetService_InitError(t *testing.T) {
+	s := NewY2BService(WithCredential("not-a-json", os.DirFS("."))).(*svc)
+	if _, err := s.GetService(); err == nil {
+		t.Fatal("expected init error, got nil")
+	}
+}
+
+func TestGetService_WithValidCachedToken(t *testing.T) {
+	expiry := time.Now().Add(time.Hour).Format(time.RFC3339)
+	s := NewY2BService(
+		WithCredential(validCredentialJSON("http://localhost"), os.DirFS(".")),
+		WithCacheToken(`{"access_token":"cached-token","token_type":"Bearer","expiry":"`+expiry+`"}`, os.DirFS(".")),
+	).(*svc)
+
+	service, err := s.GetService()
+	if err != nil {
+		t.Fatalf("GetService() error = %v", err)
+	}
+	if service == nil {
+		t.Fatal("GetService() returned nil service")
+	}
+}
+
+func TestRefreshClient_InvalidCachedTokenWithoutTokenFile(t *testing.T) {
+	s := NewY2BService(
+		WithCredential(validCredentialJSON("http://localhost"), os.DirFS(".")),
+		WithCacheToken(`{"access_token":"expired-token","token_type":"Bearer","expiry":"2000-01-01T00:00:00Z"}`, os.DirFS(".")),
+	).(*svc)
+
+	_, err := s.refreshClient()
+	if err == nil {
+		t.Fatal("expected refresh error, got nil")
+	}
+	if !strings.Contains(err.Error(), refreshTokenFailed) {
+		t.Errorf("refreshClient() error = %v, want %q", err, refreshTokenFailed)
+	}
+}
+
+func TestWithCredential_FromEnv(t *testing.T) {
+	credential := validCredentialJSON("http://localhost")
+	t.Setenv("YUTU_CREDENTIAL", credential)
+
+	s := NewY2BService(WithCredential("", os.DirFS("."))).(*svc)
+	if s.Credential != credential {
+		t.Errorf("Credential = %q, want env credential", s.Credential)
+	}
+	if s.initErr != nil {
+		t.Errorf("initErr = %v, want nil", s.initErr)
+	}
+}
+
+func TestWithCredential_Base64(t *testing.T) {
+	credential := validCredentialJSON("http://localhost")
+	s := NewY2BService(
+		WithCredential(base64.StdEncoding.EncodeToString([]byte(credential)), os.DirFS(".")),
+	).(*svc)
+
+	if s.Credential != credential {
+		t.Errorf("Credential = %q, want decoded credential", s.Credential)
+	}
+}
+
+func TestWithCacheToken_FromEnv(t *testing.T) {
+	token := `{"access_token":"env-token"}`
+	t.Setenv("YUTU_CACHE_TOKEN", token)
+
+	s := NewY2BService(WithCacheToken("", os.DirFS("."))).(*svc)
+	if s.CacheToken != token {
+		t.Errorf("CacheToken = %q, want env token", s.CacheToken)
+	}
+}
+
+func TestWithCacheToken_Base64AndJSON(t *testing.T) {
+	for _, tt := range []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "base64",
+			input: base64.StdEncoding.EncodeToString([]byte(`{"access_token":"b64-token"}`)),
+			want:  `{"access_token":"b64-token"}`,
+		},
+		{
+			name:  "json",
+			input: `{"access_token":"json-token"}`,
+			want:  `{"access_token":"json-token"}`,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			s := NewY2BService(WithCacheToken(tt.input, os.DirFS("."))).(*svc)
+			if s.CacheToken != tt.want {
+				t.Errorf("CacheToken = %q, want %q", s.CacheToken, tt.want)
+			}
+		})
 	}
 }
 
@@ -371,6 +476,54 @@ func TestGetCodeFromPrompt_ReadError(t *testing.T) {
 			"expected error to contain %q, got %q", "failed to read prompt",
 			err.Error(),
 		)
+	}
+}
+
+func TestGetTokenFromWeb_PromptFallbackSuccess(t *testing.T) {
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"access_token":"web-token","token_type":"Bearer","expires_in":3600}`)
+	}))
+	defer tokenServer.Close()
+
+	s := NewY2BService(
+		WithCredential(validCredentialJSONWithTokenURL("http://127.0.0.1:0", tokenServer.URL), os.DirFS(".")),
+		WithIO(strings.NewReader("manual-code\n"), io.Discard),
+	).(*svc)
+	s.openURLFunc = func(string) error { return errors.New("browser unavailable") }
+
+	config, err := s.getConfig()
+	if err != nil {
+		t.Fatalf("getConfig() error = %v", err)
+	}
+	token, err := s.getTokenFromWeb(config, "http://example.com/auth", "verifier")
+	if err != nil {
+		t.Fatalf("getTokenFromWeb() error = %v", err)
+	}
+	if token.AccessToken != "web-token" {
+		t.Errorf("AccessToken = %q, want web-token", token.AccessToken)
+	}
+}
+
+func TestGetTokenFromWeb_ExchangeError(t *testing.T) {
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "bad token", http.StatusBadRequest)
+	}))
+	defer tokenServer.Close()
+
+	s := NewY2BService(
+		WithCredential(validCredentialJSONWithTokenURL("http://127.0.0.1:0", tokenServer.URL), os.DirFS(".")),
+		WithIO(strings.NewReader("manual-code\n"), io.Discard),
+	).(*svc)
+	s.openURLFunc = func(string) error { return errors.New("browser unavailable") }
+
+	config, err := s.getConfig()
+	if err != nil {
+		t.Fatalf("getConfig() error = %v", err)
+	}
+	_, err = s.getTokenFromWeb(config, "http://example.com/auth", "verifier")
+	if err == nil || !strings.Contains(err.Error(), exchangeFailed) {
+		t.Fatalf("getTokenFromWeb() error = %v, want %q", err, exchangeFailed)
 	}
 }
 

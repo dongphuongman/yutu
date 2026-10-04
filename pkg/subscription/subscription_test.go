@@ -6,10 +6,12 @@ package subscription
 import (
 	"bytes"
 	"encoding/json/v2"
+	"errors"
 	"io"
 	"math"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/eat-pray-ai/yutu/pkg/common"
@@ -355,6 +357,80 @@ func TestSubscription_List(t *testing.T) {
 	)
 }
 
+func TestSubscription_List_ResourceKinds(t *testing.T) {
+	svc := common.NewTestService(
+		t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"items": [
+					{"id": "sub-video", "snippet": {"title": "Video", "resourceId": {"kind": "youtube#video", "videoId": "video-id"}}},
+					{"id": "sub-channel", "snippet": {"title": "Channel", "resourceId": {"kind": "youtube#channel", "channelId": "channel-id"}}},
+					{"id": "sub-playlist", "snippet": {"title": "Playlist", "resourceId": {"kind": "youtube#playlist", "playlistId": "playlist-id"}}}
+				]
+			}`))
+		}),
+	)
+
+	s := NewSubscription(
+		WithService(svc),
+		WithOutput("table"),
+		WithMaxResults(3),
+	)
+
+	var buf bytes.Buffer
+	if err := s.List(&buf); err != nil {
+		t.Fatalf("Subscription.List() error = %v", err)
+	}
+	output := buf.String()
+	for _, want := range []string{"video-id", "channel-id", "playlist-id"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("Subscription.List() output = %q, want %q", output, want)
+		}
+	}
+}
+
+var errWriteFailed = errors.New("write failed")
+
+type errWriter struct{}
+
+func (errWriter) Write([]byte) (int, error) {
+	return 0, errWriteFailed
+}
+
+func TestSubscription_List_PartialErrorAndPrintError(t *testing.T) {
+	requestCount := 0
+	svc := common.NewTestService(
+		t, http.HandlerFunc(
+			func(w http.ResponseWriter, _ *http.Request) {
+				requestCount++
+				w.Header().Set("Content-Type", "application/json")
+				if requestCount == 1 {
+					_, _ = w.Write([]byte(`{
+						"items": [{"id": "sub-1", "snippet": {"title": "Channel 1", "resourceId": {"kind": "youtube#channel", "channelId": "channel-1"}}}],
+						"nextPageToken": "next-page"
+					}`))
+					return
+				}
+				http.Error(w, "server error", http.StatusInternalServerError)
+			},
+		),
+	)
+
+	s := NewSubscription(
+		WithService(svc),
+		WithOutput("table"),
+		WithMaxResults(22),
+	)
+
+	err := s.List(errWriter{})
+	if !errors.Is(err, errGetSubscription) {
+		t.Errorf("Subscription.List() error = %v, want %v", err, errGetSubscription)
+	}
+	if !errors.Is(err, errWriteFailed) {
+		t.Errorf("Subscription.List() error = %v, want write error", err)
+	}
+}
+
 func TestSubscription_Insert(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -491,5 +567,41 @@ func TestSubscription_Delete(t *testing.T) {
 				}
 			},
 		)
+	}
+}
+
+func TestSubscription_Delete_DoesNotReturnEarly(t *testing.T) {
+	var gotIDs []string
+	svc := common.NewTestService(
+		t, http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				id := r.URL.Query().Get("id")
+				gotIDs = append(gotIDs, id)
+
+				if id == "sub-1" {
+					http.Error(w, "server error", http.StatusInternalServerError)
+					return
+				}
+
+				w.WriteHeader(http.StatusNoContent)
+			},
+		),
+	)
+
+	s := NewSubscription(
+		WithService(svc),
+		WithIds([]string{"sub-1", "sub-2"}),
+	)
+
+	var buf bytes.Buffer
+	err := s.Delete(&buf)
+	if !errors.Is(err, errDeleteSubscription) {
+		t.Errorf("Subscription.Delete() error = %v, want %v", err, errDeleteSubscription)
+	}
+	if !reflect.DeepEqual(gotIDs, []string{"sub-1", "sub-2"}) {
+		t.Errorf("Subscription.Delete() got IDs = %v, want [sub-1 sub-2]", gotIDs)
+	}
+	if !strings.Contains(buf.String(), "Subscription sub-2 deleted") {
+		t.Errorf("Subscription.Delete() output = %q, want successful second delete output", buf.String())
 	}
 }

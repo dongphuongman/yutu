@@ -5,6 +5,7 @@ package playlistItem
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"math"
 	"net/http"
@@ -15,6 +16,14 @@ import (
 	"github.com/eat-pray-ai/yutu/pkg/common"
 	"google.golang.org/api/youtube/v3"
 )
+
+var errWriteFailed = errors.New("write failed")
+
+type errWriter struct{}
+
+func (errWriter) Write([]byte) (int, error) {
+	return 0, errWriteFailed
+}
 
 func TestNewPlaylistItem(t *testing.T) {
 	type args struct {
@@ -311,6 +320,72 @@ func TestPlaylistItem_List(t *testing.T) {
 			return pi.List
 		},
 	)
+}
+
+func TestPlaylistItem_List_ResourceKinds(t *testing.T) {
+	svc := common.NewTestService(
+		t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{
+				"items": [
+					{"id": "item-video", "snippet": {"title": "Video", "resourceId": {"kind": "youtube#video", "videoId": "video-id"}}},
+					{"id": "item-channel", "snippet": {"title": "Channel", "resourceId": {"kind": "youtube#channel", "channelId": "channel-id"}}},
+					{"id": "item-playlist", "snippet": {"title": "Playlist", "resourceId": {"kind": "youtube#playlist", "playlistId": "playlist-id"}}}
+				]
+			}`))
+		}),
+	)
+
+	pi := NewPlaylistItem(
+		WithService(svc),
+		WithOutput("table"),
+		WithMaxResults(3),
+	)
+
+	var buf bytes.Buffer
+	if err := pi.List(&buf); err != nil {
+		t.Fatalf("PlaylistItem.List() error = %v", err)
+	}
+	output := buf.String()
+	for _, want := range []string{"video-id", "channel-id", "playlist-id"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("PlaylistItem.List() output = %q, want %q", output, want)
+		}
+	}
+}
+
+func TestPlaylistItem_List_PartialErrorAndPrintError(t *testing.T) {
+	requestCount := 0
+	svc := common.NewTestService(
+		t, http.HandlerFunc(
+			func(w http.ResponseWriter, _ *http.Request) {
+				requestCount++
+				w.Header().Set("Content-Type", "application/json")
+				if requestCount == 1 {
+					_, _ = w.Write([]byte(`{
+						"items": [{"id": "item-1", "snippet": {"title": "Item 1"}}],
+						"nextPageToken": "next-page"
+					}`))
+					return
+				}
+				http.Error(w, "server error", http.StatusInternalServerError)
+			},
+		),
+	)
+
+	pi := NewPlaylistItem(
+		WithService(svc),
+		WithOutput("table"),
+		WithMaxResults(22),
+	)
+
+	err := pi.List(errWriter{})
+	if !errors.Is(err, errGetPlaylistItem) {
+		t.Errorf("PlaylistItem.List() error = %v, want %v", err, errGetPlaylistItem)
+	}
+	if !errors.Is(err, errWriteFailed) {
+		t.Errorf("PlaylistItem.List() error = %v, want write error", err)
+	}
 }
 
 func TestPlaylistItem_Insert(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"strings"
@@ -285,6 +286,55 @@ func TestPrintResult_WriteError(t *testing.T) {
 	}
 }
 
+func TestPaginationHandler(t *testing.T) {
+	svc := NewTestService(
+		t, PaginationHandler(
+			"custom",
+			func(prefix string, i int) string {
+				return fmt.Sprintf(`{"id":"%s-%d","snippet":{"title":"Title %d"}}`, prefix, i, i)
+			},
+		),
+	)
+
+	items, err := Paginate(
+		&Fields{MaxResults: 22}, svc.Videos.List([]string{"id", "snippet"}),
+		videoExtract, errors.New("list failed"),
+	)
+	if err != nil {
+		t.Fatalf("Paginate() error = %v", err)
+	}
+	if len(items) != 22 {
+		t.Fatalf("Paginate() got %d items, want 22", len(items))
+	}
+	if items[0].Id != "custom-0" || items[21].Id != "custom-21" {
+		t.Errorf("Paginate() got first/last IDs = %q/%q", items[0].Id, items[21].Id)
+	}
+}
+
+func TestRunListTest(t *testing.T) {
+	RunListTest(
+		t,
+		`{"items":[{"id":"v1","snippet":{"title":"Title 1"}}]}`,
+		func(svc *youtube.Service, output string) func(io.Writer) error {
+			return func(w io.Writer) error {
+				items, err := Paginate(
+					&Fields{Service: svc, MaxResults: 1},
+					svc.Videos.List([]string{"id", "snippet"}),
+					videoExtract,
+					errors.New("list failed"),
+				)
+				if err != nil {
+					return err
+				}
+				return PrintList(
+					output, items, w, table.Row{"ID", "Title"},
+					func(v *youtube.Video) table.Row { return table.Row{v.Id, v.Snippet.Title} },
+				)
+			}
+		},
+	)
+}
+
 // ---------- TestSetContext ----------
 
 func TestSetContext(t *testing.T) {
@@ -293,6 +343,27 @@ func TestSetContext(t *testing.T) {
 	f.SetContext(ctx)
 	if f.Ctx != ctx {
 		t.Error("SetContext did not set context")
+	}
+}
+
+func TestGetFields(t *testing.T) {
+	f := &Fields{}
+	if got := f.GetFields(); got != f {
+		t.Error("GetFields() did not return receiver")
+	}
+}
+
+func TestPrintList_UnknownOutput(t *testing.T) {
+	items := []*youtube.Video{{Id: "v1"}}
+	header := table.Row{"ID"}
+	rowFn := func(v *youtube.Video) table.Row { return table.Row{v.Id} }
+
+	var buf bytes.Buffer
+	if err := PrintList("unknown", items, &buf, header, rowFn); err != nil {
+		t.Fatalf("PrintList() error = %v", err)
+	}
+	if buf.Len() != 0 {
+		t.Errorf("PrintList() output = %q, want empty", buf.String())
 	}
 }
 
