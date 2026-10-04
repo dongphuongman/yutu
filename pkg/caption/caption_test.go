@@ -742,17 +742,16 @@ func TestCaption_Insert_Error(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ts := httptest.NewServer(
+	ts := httptest.NewTestServer(t,
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 			},
 		),
 	)
-	defer ts.Close()
 
 	svc, _ = youtube.NewService(
-		t.Context(), option.WithEndpoint(ts.URL), option.WithAPIKey("test"),
+		t.Context(), option.WithEndpoint(ts.URL), option.WithHTTPClient(ts.Client()), option.WithAPIKey("test"),
 	)
 	c = NewCaption(WithFile("test.srt"), WithService(svc))
 	if err := c.Insert(&bytes.Buffer{}); err == nil {
@@ -773,7 +772,7 @@ func TestCaption_Update_Error(t *testing.T) {
 	defer func() { _ = f.Close() }()
 
 	// Test: File open error (when file is specified)
-	ts := httptest.NewServer(
+	ts := httptest.NewTestServer(t,
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
@@ -781,9 +780,8 @@ func TestCaption_Update_Error(t *testing.T) {
 			},
 		),
 	)
-	defer ts.Close()
 	svc, _ := youtube.NewService(
-		t.Context(), option.WithEndpoint(ts.URL), option.WithAPIKey("test"),
+		t.Context(), option.WithEndpoint(ts.URL), option.WithHTTPClient(ts.Client()), option.WithAPIKey("test"),
 	)
 
 	c := NewCaption(
@@ -794,16 +792,16 @@ func TestCaption_Update_Error(t *testing.T) {
 	}
 
 	// Test: Get error
-	tsError := httptest.NewServer(
+	tsError := httptest.NewTestServer(t,
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 			},
 		),
 	)
-	defer tsError.Close()
 	svcError, _ := youtube.NewService(
 		t.Context(), option.WithEndpoint(tsError.URL),
+		option.WithHTTPClient(tsError.Client()),
 		option.WithAPIKey("test"),
 	)
 	c = NewCaption(WithService(svcError), WithVideoId("v1"))
@@ -812,7 +810,7 @@ func TestCaption_Update_Error(t *testing.T) {
 	}
 
 	// Test: No caption found
-	tsEmpty := httptest.NewServer(
+	tsEmpty := httptest.NewTestServer(t,
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
@@ -820,9 +818,9 @@ func TestCaption_Update_Error(t *testing.T) {
 			},
 		),
 	)
-	defer tsEmpty.Close()
 	svcEmpty, _ := youtube.NewService(
 		t.Context(), option.WithEndpoint(tsEmpty.URL),
+		option.WithHTTPClient(tsEmpty.Client()),
 		option.WithAPIKey("test"),
 	)
 	c = NewCaption(WithService(svcEmpty), WithVideoId("v1"))
@@ -831,7 +829,7 @@ func TestCaption_Update_Error(t *testing.T) {
 	}
 
 	// Test: API Update Error
-	tsUpdateErr := httptest.NewServer(
+	tsUpdateErr := httptest.NewTestServer(t,
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				if r.Method == "GET" {
@@ -843,9 +841,9 @@ func TestCaption_Update_Error(t *testing.T) {
 			},
 		),
 	)
-	defer tsUpdateErr.Close()
 	svcUpdateErr, _ := youtube.NewService(
 		t.Context(), option.WithEndpoint(tsUpdateErr.URL),
+		option.WithHTTPClient(tsUpdateErr.Client()),
 		option.WithAPIKey("test"),
 	)
 	c = NewCaption(WithService(svcUpdateErr), WithVideoId("v1"))
@@ -855,16 +853,15 @@ func TestCaption_Update_Error(t *testing.T) {
 }
 
 func TestCaption_Delete_Error(t *testing.T) {
-	ts := httptest.NewServer(
+	ts := httptest.NewTestServer(t,
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 			},
 		),
 	)
-	defer ts.Close()
 	svc, _ := youtube.NewService(
-		t.Context(), option.WithEndpoint(ts.URL), option.WithAPIKey("test"),
+		t.Context(), option.WithEndpoint(ts.URL), option.WithHTTPClient(ts.Client()), option.WithAPIKey("test"),
 	)
 
 	c := NewCaption(WithService(svc), WithIds([]string{"id1"}))
@@ -875,16 +872,15 @@ func TestCaption_Delete_Error(t *testing.T) {
 
 func TestCaption_Download_Error(t *testing.T) {
 	// Test API Error
-	ts := httptest.NewServer(
+	ts := httptest.NewTestServer(t,
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 			},
 		),
 	)
-	defer ts.Close()
 	svc, _ := youtube.NewService(
-		t.Context(), option.WithEndpoint(ts.URL), option.WithAPIKey("test"),
+		t.Context(), option.WithEndpoint(ts.URL), option.WithHTTPClient(ts.Client()), option.WithAPIKey("test"),
 	)
 
 	c := NewCaption(
@@ -895,16 +891,16 @@ func TestCaption_Download_Error(t *testing.T) {
 	}
 
 	// Test File Creation Error
-	ts2 := httptest.NewServer(
+	ts2 := httptest.NewTestServer(t,
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				_, _ = w.Write([]byte("content"))
 			},
 		),
 	)
-	defer ts2.Close()
 	svc2, _ := youtube.NewService(
 		t.Context(), option.WithEndpoint(ts2.URL),
+		option.WithHTTPClient(ts2.Client()),
 		option.WithAPIKey("test"),
 	)
 	// Use a directory as file path to trigger error.

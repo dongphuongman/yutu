@@ -4,7 +4,6 @@
 package auth
 
 import (
-	"context"
 	"encoding/json/v2"
 	"fmt"
 	"log/slog"
@@ -14,9 +13,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/eat-pray-ai/yutu/pkg"
-	"github.com/eat-pray-ai/yutu/pkg/utils"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
@@ -34,6 +33,7 @@ const (
 	parseTokenFailed   = "failed to parse token"
 	refreshTokenFailed = "failed to refresh token, please re-authenticate in cli"
 	parseSecretFailed  = "failed to parse client secret"
+	authTimeout        = "authorization timed out after %s"
 
 	browserOpenedHint = "Your browser has been opened to an authorization URL. yutu will resume once authorization has been provided.\n%s\n"
 	openBrowserHint   = "It seems that your browser is not open. Go to the following link in your browser:\n%s\n"
@@ -152,15 +152,15 @@ func (s *svc) getConfig() (*oauth2.Config, error) {
 	return config, nil
 }
 
-func (s *svc) startWebServer(redirectURL string) (chan string, error) {
+func (s *svc) startWebServer(redirectURL string) (chan string, func() error, error) {
 	u, err := url.Parse(redirectURL)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", parseUrlFailed, err)
+		return nil, nil, fmt.Errorf("%s: %w", parseUrlFailed, err)
 	}
 
 	listener, err := net.Listen("tcp", u.Host)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w", listenFailed, err)
+		return nil, nil, fmt.Errorf("%s: %w", listenFailed, err)
 	}
 
 	codeCh := make(chan string, 1)
@@ -174,9 +174,7 @@ func (s *svc) startWebServer(redirectURL string) (chan string, error) {
 					}
 					state := r.FormValue("state")
 					if state != s.state {
-						slog.Error(
-							stateMatchFailed, "actual", state, "expected", s.state,
-						)
+						slog.Error(stateMatchFailed)
 						http.Error(w, stateMatchFailed, http.StatusBadRequest)
 						return
 					}
@@ -197,7 +195,18 @@ func (s *svc) startWebServer(redirectURL string) (chan string, error) {
 		)
 	}()
 
-	return codeCh, nil
+	return codeCh, listener.Close, nil
+}
+
+func (s *svc) waitForCode(codeCh <-chan string) (string, error) {
+	select {
+	case code := <-codeCh:
+		return code, nil
+	case <-s.ctx.Done():
+		return "", s.ctx.Err()
+	case <-time.After(s.timeout):
+		return "", fmt.Errorf(authTimeout, s.timeout)
+	}
 }
 
 func (s *svc) getCodeFromPrompt(authURL string, redirectURL string) (code string, err error) {
@@ -217,15 +226,19 @@ func (s *svc) getCodeFromPrompt(authURL string, redirectURL string) (code string
 func (s *svc) getTokenFromWeb(
 	config *oauth2.Config, authURL string, verifier string,
 ) (*oauth2.Token, error) {
-	codeCh, err := s.startWebServer(config.RedirectURL)
+	codeCh, closeServer, err := s.startWebServer(config.RedirectURL)
 	if err != nil {
 		return nil, err
 	}
+	defer func() { _ = closeServer() }()
 
 	var code string
-	if err := utils.OpenURL(authURL); err == nil {
+	if err := s.openURL(authURL); err == nil {
 		_, _ = fmt.Fprintf(s.out, browserOpenedHint, authURL)
-		code = <-codeCh
+		code, err = s.waitForCode(codeCh)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if code == "" {
@@ -235,9 +248,9 @@ func (s *svc) getTokenFromWeb(
 		}
 	}
 
-	slog.Debug("Authorization code generated", "code", code)
+	slog.Debug("Authorization code received")
 	token, err := config.Exchange(
-		context.TODO(), code, oauth2.VerifierOption(verifier),
+		s.ctx, code, oauth2.VerifierOption(verifier),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", exchangeFailed, err)

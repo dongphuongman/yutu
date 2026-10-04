@@ -43,16 +43,15 @@ func TestChannelBanner_Insert_Error(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	ts := httptest.NewServer(
+	ts := httptest.NewTestServer(t,
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 			},
 		),
 	)
-	defer ts.Close()
 	svc, _ = youtube.NewService(
-		t.Context(), option.WithEndpoint(ts.URL), option.WithAPIKey("test"),
+		t.Context(), option.WithEndpoint(ts.URL), option.WithHTTPClient(ts.Client()), option.WithAPIKey("test"),
 	)
 	cb = NewChannelBanner(
 		WithFile("test.jpg"), WithService(svc), WithChannelId("cid"),
@@ -79,7 +78,7 @@ func TestChannelBanner_Insert_Output(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ts := httptest.NewServer(
+	ts := httptest.NewTestServer(t,
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
@@ -87,9 +86,8 @@ func TestChannelBanner_Insert_Output(t *testing.T) {
 			},
 		),
 	)
-	defer ts.Close()
 	svc, _ := youtube.NewService(
-		t.Context(), option.WithEndpoint(ts.URL), option.WithAPIKey("test"),
+		t.Context(), option.WithEndpoint(ts.URL), option.WithHTTPClient(ts.Client()), option.WithAPIKey("test"),
 	)
 
 	tests := []struct {

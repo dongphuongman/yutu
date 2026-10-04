@@ -13,10 +13,8 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -49,22 +47,6 @@ func PrintJSON(data any, writer io.Writer) {
 func PrintYAML(data any, writer io.Writer) {
 	marshalled, _ := yaml.Marshal(data)
 	_, _ = fmt.Fprintln(writer, string(marshalled))
-}
-
-func OpenURL(url string) error {
-	var err error
-	switch runtime.GOOS {
-	case "windows":
-		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
-	case "linux":
-		err = exec.Command("xdg-open", url).Start()
-	case "darwin":
-		err = exec.Command("open", url).Start()
-	default:
-		err = fmt.Errorf("cannot open URL %s on this platform", url)
-	}
-
-	return err
 }
 
 func RandomStage() string {

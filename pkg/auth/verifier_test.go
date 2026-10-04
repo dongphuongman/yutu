@@ -14,7 +14,7 @@ import (
 )
 
 func TestGoogleTokenVerifier_ValidToken(t *testing.T) {
-	ts := httptest.NewServer(
+	ts := httptest.NewTestServer(t,
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				token := r.URL.Query().Get("access_token")
@@ -33,7 +33,7 @@ func TestGoogleTokenVerifier_ValidToken(t *testing.T) {
 			},
 		),
 	)
-	defer ts.Close()
+	ts.Start()
 
 	verifier := NewGoogleTokenVerifier(ts.URL)
 	info, err := verifier(t.Context(), "valid-google-token", nil)
@@ -56,7 +56,7 @@ func TestGoogleTokenVerifier_ValidToken(t *testing.T) {
 }
 
 func TestGoogleTokenVerifier_InvalidToken(t *testing.T) {
-	ts := httptest.NewServer(
+	ts := httptest.NewTestServer(t,
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusBadRequest)
@@ -64,7 +64,7 @@ func TestGoogleTokenVerifier_InvalidToken(t *testing.T) {
 			},
 		),
 	)
-	defer ts.Close()
+	ts.Start()
 
 	verifier := NewGoogleTokenVerifier(ts.URL)
 	_, err := verifier(t.Context(), "bad-token", nil)
@@ -77,14 +77,14 @@ func TestGoogleTokenVerifier_InvalidToken(t *testing.T) {
 }
 
 func TestGoogleTokenVerifier_ServerError(t *testing.T) {
-	ts := httptest.NewServer(
+	ts := httptest.NewTestServer(t,
 		http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 			},
 		),
 	)
-	defer ts.Close()
+	ts.Start()
 
 	verifier := NewGoogleTokenVerifier(ts.URL)
 	_, err := verifier(t.Context(), "any-token", nil)

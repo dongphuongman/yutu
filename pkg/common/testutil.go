@@ -20,12 +20,12 @@ import (
 // It registers cleanup of the test server automatically.
 func NewTestService(t *testing.T, handler http.Handler) *youtube.Service {
 	t.Helper()
-	ts := httptest.NewServer(handler)
-	t.Cleanup(ts.Close)
+	ts := httptest.NewTestServer(t, handler)
 
 	svc, err := youtube.NewService(
 		t.Context(),
 		option.WithEndpoint(ts.URL),
+		option.WithHTTPClient(ts.Client()),
 		option.WithAPIKey("test-key"),
 	)
 	if err != nil {

@@ -5,7 +5,9 @@ package auth
 
 import (
 	"bytes"
+	"context"
 	"encoding/json/v2"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -13,6 +15,7 @@ import (
 	"strings"
 	"testing"
 	"testing/iotest"
+	"testing/synctest"
 	"time"
 
 	"github.com/eat-pray-ai/yutu/pkg"
@@ -106,7 +109,7 @@ func TestStartWebServer_InvalidURL(t *testing.T) {
 	s := NewY2BService().(*svc)
 	s.state = "state"
 
-	_, err := s.startWebServer("://bad-url")
+	_, _, err := s.startWebServer("://bad-url")
 	if err == nil {
 		t.Fatalf("expected error for invalid URL, got nil")
 	}
@@ -129,7 +132,7 @@ func TestStartWebServer_PortConflict(t *testing.T) {
 	s := NewY2BService().(*svc)
 	s.state = "state"
 
-	_, err = s.startWebServer(redirectURL)
+	_, _, err = s.startWebServer(redirectURL)
 	if err == nil {
 		t.Fatalf("expected error due to port conflict, got nil")
 	}
@@ -148,10 +151,11 @@ func TestStartWebServer_StateMismatch(t *testing.T) {
 
 	s := NewY2BService().(*svc)
 	s.state = "expected-state"
-	codeCh, err := s.startWebServer(redirectURL)
+	codeCh, closeServer, err := s.startWebServer(redirectURL)
 	if err != nil {
 		t.Fatalf("startWebServer returned error: %v", err)
 	}
+	defer func() { _ = closeServer() }()
 
 	// Send a request with mismatched state.
 	resp, err := http.Get(redirectURL + "/?state=wrong&code=code123")
@@ -259,10 +263,11 @@ func TestStartWebServer_Success(t *testing.T) {
 	s := NewY2BService().(*svc)
 	s.state = "test-state"
 
-	codeCh, err := s.startWebServer(redirectURL)
+	codeCh, closeServer, err := s.startWebServer(redirectURL)
 	if err != nil {
 		t.Fatalf("startWebServer error: %v", err)
 	}
+	defer func() { _ = closeServer() }()
 
 	// Send the HTTP request in a goroutine to avoid deadlock:
 	// the handler blocks on codeCh <- code until someone reads from codeCh.
@@ -367,4 +372,32 @@ func TestGetCodeFromPrompt_ReadError(t *testing.T) {
 			err.Error(),
 		)
 	}
+}
+
+func TestGetTokenFromWeb_ContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	s := NewY2BService(
+		WithContext(ctx),
+		WithCallbackTimeout(time.Hour),
+	).(*svc)
+
+	_, err := s.waitForCode(make(chan string))
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("waitForCode() error = %v, want context.Canceled", err)
+	}
+}
+
+func TestWaitForCode_Timeout(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		s := NewY2BService(WithCallbackTimeout(2 * time.Minute)).(*svc)
+
+		_, err := s.waitForCode(make(chan string))
+		if err == nil || !strings.Contains(err.Error(), "authorization timed out after 2m0s") {
+			t.Fatalf(
+				"waitForCode() error = %v, want authorization timed out after 2m0s", err,
+			)
+		}
+	})
 }

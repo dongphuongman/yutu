@@ -11,8 +11,11 @@ import (
 	"io/fs"
 	"log/slog"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
+	"time"
 
 	"github.com/eat-pray-ai/yutu/pkg"
 	"github.com/eat-pray-ai/yutu/pkg/utils"
@@ -20,9 +23,11 @@ import (
 )
 
 const (
-	readTokenFailed  = "failed to read token"
-	readSecretFailed = "failed to read client secret"
-	authHint         = "Please configure client secret as described in https://github.com/eat-pray-ai/yutu#prerequisites"
+	authHint = "Please configure client secret as described in https://github.com/eat-pray-ai/yutu#prerequisites"
+
+	readTokenFailed        = "failed to read token"
+	readSecretFailed       = "failed to read client secret"
+	defaultCallbackTimeout = 2 * time.Minute
 )
 
 type svc struct {
@@ -31,9 +36,11 @@ type svc struct {
 	credFile    string
 	tokenFile   string
 	redirectURL string
+	timeout     time.Duration
 	initErr     error
 	in          io.Reader
 	out         io.Writer
+	openURLFunc func(string) error
 
 	service *youtube.Service
 	ctx     context.Context
@@ -50,6 +57,7 @@ func NewY2BService(opts ...Option) Svc {
 	s := &svc{}
 	s.ctx = context.Background()
 	s.credFile = "client_secret.json"
+	s.timeout = defaultCallbackTimeout
 	s.state = utils.RandomStage()
 	s.in = os.Stdin
 	s.out = os.Stdout
@@ -72,11 +80,37 @@ func WithRedirectURL(url string) Option {
 	}
 }
 
+func WithCallbackTimeout(timeout time.Duration) Option {
+	return func(s *svc) {
+		s.timeout = timeout
+	}
+}
+
 func WithIO(in io.Reader, out io.Writer) Option {
 	return func(s *svc) {
 		s.in = in
 		s.out = out
 	}
+}
+
+func (s *svc) openURL(url string) error {
+	if s.openURLFunc != nil {
+		return s.openURLFunc(url)
+	}
+
+	var err error
+	switch runtime.GOOS {
+	case "windows":
+		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	case "linux":
+		err = exec.Command("xdg-open", url).Start()
+	case "darwin":
+		err = exec.Command("open", url).Start()
+	default:
+		err = fmt.Errorf("cannot open URL %s on this platform", url)
+	}
+
+	return err
 }
 
 func WithCredential(cred string, fsys fs.FS) Option {

@@ -58,6 +58,7 @@ func TestNewY2BService(t *testing.T) {
 				Credential: credential,
 				CacheToken: cacheToken,
 				credFile:   credFile,
+				timeout:    defaultCallbackTimeout,
 				ctx:        t.Context(),
 				in:         reader,
 				out:        writer,
@@ -77,6 +78,7 @@ func TestNewY2BService(t *testing.T) {
 				Credential: credential,
 				CacheToken: cacheToken,
 				credFile:   credFile,
+				timeout:    defaultCallbackTimeout,
 				ctx:        t.Context(),
 				in:         reader,
 				out:        writer,
@@ -97,6 +99,7 @@ func TestNewY2BService(t *testing.T) {
 				CacheToken: cacheToken,
 				credFile:   absCred,
 				tokenFile:  tokenFile,
+				timeout:    defaultCallbackTimeout,
 				ctx:        t.Context(),
 				in:         reader,
 				out:        writer,
@@ -109,6 +112,7 @@ func TestNewY2BService(t *testing.T) {
 			},
 			want: &svc{
 				credFile: credFile,
+				timeout:  defaultCallbackTimeout,
 				ctx:      t.Context(),
 				in:       os.Stdin,
 				out:      os.Stdout,
@@ -120,8 +124,10 @@ func TestNewY2BService(t *testing.T) {
 		t.Run(
 			tt.name, func(t *testing.T) {
 				got := NewY2BService(tt.args.opts...).(*svc)
+				got.openURLFunc = nil
 				got.state = ""
 				want := tt.want.(*svc)
+				want.openURLFunc = nil
 				want.state = ""
 				if !reflect.DeepEqual(got, want) {
 					t.Errorf("NewY2BService() = %v, want %v", got, want)
