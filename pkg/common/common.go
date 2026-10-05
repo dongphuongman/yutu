@@ -21,20 +21,18 @@ import (
 	"google.golang.org/api/youtube/v3"
 )
 
-// ServiceProvider resolves an authenticated YouTube service for the given
-// context. Override DefaultServiceProvider at startup to inject a custom
-// credential resolution strategy.
-type ServiceProvider interface {
-	GetYouTubeService(ctx context.Context) (*youtube.Service, error)
-}
+type ServiceProvider func(context.Context) (*youtube.Service, error)
 
 const DefaultRedirectURL = "http://localhost:8216"
 
-type defaultProvider struct{}
+var DefaultServiceProvider ServiceProvider = defaultYouTubeService
 
-// DefaultServiceProvider is used by Fields.EnsureService to create a
-// YouTube service when one is not already set.
-var DefaultServiceProvider ServiceProvider = &defaultProvider{}
+func SetDefaultServiceProvider(provider ServiceProvider) {
+	if provider == nil {
+		provider = defaultYouTubeService
+	}
+	DefaultServiceProvider = provider
+}
 
 type Fields struct {
 	Ctx        context.Context  `yaml:"-" json:"-"`
@@ -70,7 +68,7 @@ func (d *Fields) EnsureService() error {
 		ctx = context.Background()
 	}
 
-	svc, err := DefaultServiceProvider.GetYouTubeService(ctx)
+	svc, err := DefaultServiceProvider(ctx)
 	if err != nil {
 		return err
 	}
@@ -78,7 +76,7 @@ func (d *Fields) EnsureService() error {
 	return nil
 }
 
-func (p *defaultProvider) GetYouTubeService(ctx context.Context) (*youtube.Service, error) {
+func defaultYouTubeService(ctx context.Context) (*youtube.Service, error) {
 	// MCP OAuth path: use access token from auth middleware context.
 	if tokenInfo := sdkauth.TokenInfoFromContext(ctx); tokenInfo != nil {
 		rawToken, ok := tokenInfo.Extra["access_token"].(string)
@@ -126,6 +124,12 @@ func WithOutput[T HasFields](output string) func(T) {
 func WithService[T HasFields](svc *youtube.Service) func(T) {
 	return func(t T) {
 		t.GetFields().Service = svc
+	}
+}
+
+func WithContext[T HasFields](ctx context.Context) func(T) {
+	return func(t T) {
+		t.GetFields().Ctx = ctx
 	}
 }
 

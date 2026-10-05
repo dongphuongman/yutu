@@ -5,6 +5,7 @@ package common
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -22,6 +23,8 @@ import (
 type testResource struct {
 	Fields
 }
+
+type providerContextKey struct{}
 
 func (r *testResource) GetFields() *Fields {
 	return &r.Fields
@@ -383,6 +386,53 @@ func TestEnsureService(t *testing.T) {
 	})
 }
 
+func TestEnsureService_UsesDefaultServiceProvider(t *testing.T) {
+	originalProvider := DefaultServiceProvider
+	t.Cleanup(func() { DefaultServiceProvider = originalProvider })
+
+	wantSvc := &youtube.Service{}
+	ctx := context.WithValue(t.Context(), providerContextKey{}, "test-user")
+	called := false
+	var ctxValue any
+	SetDefaultServiceProvider(func(gotCtx context.Context) (*youtube.Service, error) {
+		called = true
+		if gotCtx != ctx {
+			t.Errorf("ServiceProvider context = %p, want %p", gotCtx, ctx)
+		}
+		ctxValue = gotCtx.Value(providerContextKey{})
+		return wantSvc, nil
+	})
+
+	f := &Fields{}
+	f.SetContext(ctx)
+	if err := f.EnsureService(); err != nil {
+		t.Fatalf("EnsureService() error = %v, want nil", err)
+	}
+	if !called {
+		t.Fatal("expected DefaultServiceProvider to be called")
+	}
+	if ctxValue != "test-user" {
+		t.Errorf("provider context value = %v, want test-user", ctxValue)
+	}
+	if f.Service != wantSvc {
+		t.Error("EnsureService() did not assign provider service")
+	}
+}
+
+func TestSetDefaultServiceProvider_NilRestoresDefault(t *testing.T) {
+	originalProvider := DefaultServiceProvider
+	t.Cleanup(func() { DefaultServiceProvider = originalProvider })
+
+	SetDefaultServiceProvider(func(context.Context) (*youtube.Service, error) {
+		return &youtube.Service{}, nil
+	})
+	SetDefaultServiceProvider(nil)
+
+	if DefaultServiceProvider == nil {
+		t.Fatal("DefaultServiceProvider is nil")
+	}
+}
+
 func TestEnsureService_FallsBackWithoutContext(t *testing.T) {
 	f := &Fields{}
 	err := f.EnsureService()
@@ -434,6 +484,17 @@ func TestWithMaxResults(t *testing.T) {
 				t.Errorf("WithMaxResults(%d) = %d, want %d", tt.input, r.MaxResults, tt.want)
 			}
 		})
+	}
+}
+
+func TestWithContext(t *testing.T) {
+	ctx := context.WithValue(t.Context(), providerContextKey{}, "value")
+	r := &testResource{}
+
+	WithContext[*testResource](ctx)(r)
+
+	if r.Ctx != ctx {
+		t.Error("WithContext() did not set context")
 	}
 }
 
