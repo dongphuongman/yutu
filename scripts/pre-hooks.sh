@@ -11,7 +11,8 @@ cd "$REPO_ROOT"
 # Constants & Helpers
 # ---------------------------------------------------------------------------
 SENSITIVE_FILES=("client_secret.json" "youtube.token.json" ".env" ".env.local")
-RESOURCE_TARGETS=("main.go" "internal/tools/skillgen/main.go" "internal/tools/cmdtestgen/main.go")
+RESOURCE_REGISTRY="cmd/resources/resources.go"
+RESOURCE_CONSUMERS=("main.go" "internal/tools/skillgen/main.go" "internal/tools/cmdtestgen/main.go")
 DOC_FILES=("README.md" "README_zh.md" "docs/FEATURES.md" "server.json")
 ADDLICENSE_ARGS=(
     -c "eat-pray-ai & OpenWaygate"
@@ -80,8 +81,8 @@ hook_pre_commit() {
     done
     success "No sensitive files detected in staging area."
 
-    if echo "$changed_files" | grep -qE '^(pkg/|cmd/|main\.go|internal/tools/)'; then
-        info "Verifying resource registration across main.go and code generators..."
+    if echo "$changed_files" | grep -qE '^(pkg/|cmd/|main\.go|internal/tools/|scripts/pre-hooks\.sh)'; then
+        info "Verifying resource registration..."
         for dir in pkg/*/; do
             pkg_name="$(basename "$dir")"
             if [[ "$pkg_name" == "auth" || "$pkg_name" == "common" || "$pkg_name" == "utils" ]]; then
@@ -89,11 +90,16 @@ hook_pre_commit() {
             fi
 
             import_path="github.com/eat-pray-ai/yutu/cmd/${pkg_name}"
-            for target in "${RESOURCE_TARGETS[@]}"; do
-                if ! grep -q "$import_path" "$target"; then
-                    abort "Resource '$pkg_name' is missing registration '$import_path' in $target (see docs/BEFORE_RELEASE.md Section 1)."
-                fi
-            done
+            if ! grep -q "$import_path" "$RESOURCE_REGISTRY"; then
+                abort "Resource '$pkg_name' is missing registration '$import_path' in $RESOURCE_REGISTRY (see docs/BEFORE_RELEASE.md Section 1)."
+            fi
+        done
+
+        registry_import="github.com/eat-pray-ai/yutu/cmd/resources"
+        for target in "${RESOURCE_CONSUMERS[@]}"; do
+            if ! grep -q "$registry_import" "$target"; then
+                abort "Resource registry '$registry_import' is missing from $target (see docs/BEFORE_RELEASE.md Section 1)."
+            fi
         done
         success "All resource packages are properly registered."
 
