@@ -4,6 +4,7 @@
 package videoCategory
 
 import (
+	"context"
 	"io"
 
 	cobramcp "github.com/eat-pray-ai/cobra-mcp"
@@ -61,9 +62,10 @@ var listCmd = &cobra.Command{
 }
 
 var categoriesHandler = cobramcp.GenResourceHandler(
-	vcName, pkg.JsonMIME, func(req *mcp.ReadResourceRequest, w io.Writer) error {
+	vcName, pkg.JsonMIME, func(ctx context.Context, req *mcp.ReadResourceRequest, w io.Writer) error {
 		hl := utils.ExtractHl(req.Params.URI)
 		vc := videoCategory.NewVideoCategory(
+			videoCategory.WithContext(ctx),
 			videoCategory.WithHl(hl),
 			videoCategory.WithRegionCode("US"),
 			videoCategory.WithParts(defaultParts),

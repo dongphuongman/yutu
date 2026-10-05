@@ -73,4 +73,5 @@ var (
 	WithParts   = common.WithParts[*I18nLanguage]
 	WithOutput  = common.WithOutput[*I18nLanguage]
 	WithService = common.WithService[*I18nLanguage]
+	WithContext = common.WithContext[*I18nLanguage]
 )

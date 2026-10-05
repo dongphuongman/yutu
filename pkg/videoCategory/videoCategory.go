@@ -85,4 +85,5 @@ var (
 	WithParts   = common.WithParts[*VideoCategory]
 	WithOutput  = common.WithOutput[*VideoCategory]
 	WithService = common.WithService[*VideoCategory]
+	WithContext = common.WithContext[*VideoCategory]
 )

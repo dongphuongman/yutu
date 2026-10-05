@@ -4,6 +4,7 @@
 package i18nRegion
 
 import (
+	"context"
 	"io"
 
 	cobramcp "github.com/eat-pray-ai/cobra-mcp"
@@ -57,9 +58,10 @@ var listCmd = &cobra.Command{
 
 var regionsHandler = cobramcp.GenResourceHandler(
 	regionName, pkg.JsonMIME,
-	func(req *mcp.ReadResourceRequest, w io.Writer) error {
+	func(ctx context.Context, req *mcp.ReadResourceRequest, w io.Writer) error {
 		hl := utils.ExtractHl(req.Params.URI)
 		input := i18nRegion.NewI18nRegion(
+			i18nRegion.WithContext(ctx),
 			i18nRegion.WithHl(hl),
 			i18nRegion.WithParts(defaultParts),
 			i18nRegion.WithOutput("json"),

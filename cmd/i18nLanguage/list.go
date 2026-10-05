@@ -4,6 +4,7 @@
 package i18nLanguage
 
 import (
+	"context"
 	"io"
 
 	cobramcp "github.com/eat-pray-ai/cobra-mcp"
@@ -67,8 +68,9 @@ var listCmd = &cobra.Command{
 }
 
 var hlHandler = cobramcp.GenResourceHandler(
-	hlName, pkg.JsonMIME, func(req *mcp.ReadResourceRequest, w io.Writer) error {
+	hlName, pkg.JsonMIME, func(ctx context.Context, req *mcp.ReadResourceRequest, w io.Writer) error {
 		input := i18nLanguage.NewI18nLanguage(
+			i18nLanguage.WithContext(ctx),
 			i18nLanguage.WithParts(defaultParts),
 			i18nLanguage.WithOutput("json"),
 		)
@@ -77,9 +79,10 @@ var hlHandler = cobramcp.GenResourceHandler(
 )
 
 var langsHandler = cobramcp.GenResourceHandler(
-	langName, pkg.JsonMIME, func(req *mcp.ReadResourceRequest, w io.Writer) error {
+	langName, pkg.JsonMIME, func(ctx context.Context, req *mcp.ReadResourceRequest, w io.Writer) error {
 		hl := utils.ExtractHl(req.Params.URI)
 		input := i18nLanguage.NewI18nLanguage(
+			i18nLanguage.WithContext(ctx),
 			i18nLanguage.WithHl(hl),
 			i18nLanguage.WithParts(defaultParts),
 			i18nLanguage.WithOutput("json"),

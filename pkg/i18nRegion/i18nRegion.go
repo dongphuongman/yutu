@@ -71,4 +71,5 @@ var (
 	WithParts   = common.WithParts[*I18nRegion]
 	WithOutput  = common.WithOutput[*I18nRegion]
 	WithService = common.WithService[*I18nRegion]
+	WithContext = common.WithContext[*I18nRegion]
 )
