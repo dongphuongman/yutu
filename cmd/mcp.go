@@ -34,6 +34,10 @@ var mcpConfig = &cobramcp.Config{
 
 var Server, mcpCmd = cobramcp.ServerAndCommand(mcpConfig)
 
+func SetToolExecutionHook(hook cobramcp.ToolExecutionHook) {
+	cobramcp.SetDefaultToolExecutionHook(hook)
+}
+
 func init() {
 	mcpCmd.Example = example
 	RootCmd.AddCommand(mcpCmd)
