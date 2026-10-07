@@ -29,7 +29,7 @@
     "oauth2"
   ],
   "engines": {
-    "node": ">=18"
+    "node": "24"
   },
   "optionalDependencies": {
     "@eat-pray-ai/yutu-darwin-arm64": "0.0.0",
